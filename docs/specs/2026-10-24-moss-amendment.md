@@ -1,0 +1,16 @@
+Source: https://app.notion.com/p/3fd03b8af6fc81829c27df96c35f392c
+Retrieved October 24, 2026. This is specification, not implementation evidence.
+
+## 13. October 24 amendment — optional Moss retrieval prototype
+
+<b>Status: planned experiment, not implemented or validated.</b> This is a narrow addendum to the October 18 design lock. It changes neither DOXA's research thesis nor its six required systems, local-first interfaces, canonical SQLite/append-only experiment ledger, or existing release acceptance obligations.
+
+<b>Placement.</b> Moss is a candidate materialized semantic-retrieval backend for Memory Tribunal and selected agent-context lookups, <b>not</b> a model provider, decision authority, event store, provenance ledger, autonomous memory manager or seventh research system. Keep the controller's <code>RetrievalBackend</code> port backend-neutral with a working local baseline; enable Moss only through explicit configuration. Never let an index result alone promote a memory, confer trust or authorize sharing.
+
+<b>Data and safety contract.</b> The SQLite memory record and ledger remain authoritative for ID, source event/trajectory/branch, ownership, scope (agent-private/shared), trust state, validation reference, revocation/supersession and eligibility. Index text and stable IDs as a derived, rebuildable view. Before returning any candidate to an agent, recheck current authorization, trust and revocation in SQLite; fail closed when sync is stale or unavailable. Record retrieval query, backend, index snapshot/version when known, returned IDs, eligibility decisions, latency and incurred cost in typed events without copying secrets.
+
+<b>Minimal prototype.</b> After a stable Gate A, compare the local baseline with an opt-in Moss adapter using a synthetic two-agent memory fixture: private memories for each agent, one expressly shared verified memory, a quarantined false lesson, a verified lesson later revoked, and a corrected/superseded memory. Exercise capture → proposal → verification/promotion → index → query → revocation → reload and cross-agent sharing. Measure task relevance, isolation, false-memory leakage, update visibility and observed latency/cost; preserve the exact fixture and result records. The prototype succeeds only if approved scoped memories retrieve correctly and no quarantined, revoked or unauthorized private memory influences ordinary agent guidance, even against a stale index. Fallback must work without Moss credentials or connectivity.
+
+<b>Timing and spending.</b> Gate A and six-system end-to-end functionality remain ahead of optional integration polish. If the spike threatens the main path, record it as incomplete and continue with the local adapter. Dana reports \$100 in Moss promotional credits, but eligibility, terms and expiration have not been verified; the existing \$75 cash experiment/compute ceiling is <b>not increased</b>. Require explicit opt-in for paid services and do not treat unknown external usage as \$0.
+
+<b>References.</b> [Moss real-time local indexing](https://docs.moss.dev/docs/build/real-time-local-indexing) · [Moss cross-agent handoff](https://docs.moss.dev/docs/build/cross-agent-handoff) · [Moss pricing and limits](https://docs.moss.dev/docs/pricing).

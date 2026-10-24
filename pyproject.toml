@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "doxa"
+version = "0.1.0a0"
+description = "Local-first epistemic experiment framework — foundational architecture"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1", "pydantic>=2.10,<3", "uvicorn>=0.34,<1",
+  "alembic>=1.14,<2", "sqlalchemy>=2.0,<3", "typer>=0.15,<1",
+  "httpx>=0.28,<1", "python-dotenv>=1,<2",
+]
+
+[project.optional-dependencies]
+moss = ["moss>=1.16,<2"]
+dev = ["pytest>=8,<10", "httpx>=0.28,<1", "ruff>=0.11,<1", "mypy>=1.15,<2"]
+
+[project.scripts]
+doxa = "doxa.cli.main:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/doxa"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["doxa"]

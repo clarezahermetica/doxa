@@ -1,0 +1,9 @@
+{
+  "name": "doxa-development-tools",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "Optional developer SDK dependencies; not a Node backend or Studio bundle",
+  "devDependencies": {
+    "@moss-js/moss": "^1.21.0"
+  }
+}

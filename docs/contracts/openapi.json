@@ -1,0 +1,6383 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DOXA foundation",
+    "version": "0.1.0a0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Api Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/configuration": {
+      "get": {
+        "summary": "Configuration",
+        "operationId": "configuration_api_configuration_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouncilConfig-Output"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Save Configuration",
+        "operationId": "save_configuration_api_configuration_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CouncilConfig-Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs": {
+      "get": {
+        "summary": "Runs",
+        "operationId": "runs_api_runs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Run"
+                  },
+                  "type": "array",
+                  "title": "Response Runs Api Runs Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Configure Run",
+        "operationId": "configure_run_api_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigureRun"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/branches/{branch_id}/commands": {
+      "post": {
+        "summary": "Research Command",
+        "operationId": "research_command_api_runs__run_id__branches__branch_id__commands_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Branch Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/LifecycleCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CloseBranchCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ClaimCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EvidenceCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DecisionCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EnvironmentCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VerifyCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CheckpointCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ForkCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ChallengeCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AdjudicateCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RespondCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReflectCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EvaluateCommand"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AnnotateCommand"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "operation",
+                  "mapping": {
+                    "lifecycle": "#/components/schemas/LifecycleCommand",
+                    "close_branch": "#/components/schemas/CloseBranchCommand",
+                    "claim": "#/components/schemas/ClaimCommand",
+                    "evidence": "#/components/schemas/EvidenceCommand",
+                    "decision": "#/components/schemas/DecisionCommand",
+                    "environment": "#/components/schemas/EnvironmentCommand",
+                    "verify": "#/components/schemas/VerifyCommand",
+                    "checkpoint": "#/components/schemas/CheckpointCommand",
+                    "fork": "#/components/schemas/ForkCommand",
+                    "challenge": "#/components/schemas/ChallengeCommand",
+                    "adjudicate": "#/components/schemas/AdjudicateCommand",
+                    "respond": "#/components/schemas/RespondCommand",
+                    "reflect": "#/components/schemas/ReflectCommand",
+                    "evaluate": "#/components/schemas/EvaluateCommand",
+                    "annotate": "#/components/schemas/AnnotateCommand"
+                  }
+                },
+                "title": "Command"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compare": {
+      "get": {
+        "summary": "Compare Runs",
+        "operationId": "compare_runs_api_compare_get",
+        "parameters": [
+          {
+            "name": "baseline",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Baseline"
+            }
+          },
+          {
+            "name": "treatment",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Treatment"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Comparison"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/compare-branches": {
+      "get": {
+        "summary": "Branch Comparison",
+        "operationId": "branch_comparison_api_runs__run_id__compare_branches_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "baseline",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Baseline"
+            }
+          },
+          {
+            "name": "treatment",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Treatment"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchComparison"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}": {
+      "get": {
+        "summary": "Inspect",
+        "operationId": "inspect_api_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunBundle"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/export": {
+      "get": {
+        "summary": "Export",
+        "operationId": "export_api_runs__run_id__export_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunBundle"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/execute": {
+      "post": {
+        "summary": "Execute",
+        "operationId": "execute_api_runs__run_id__execute_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ExecuteTask"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Command"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RunBundle"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Execute Api Runs  Run Id  Execute Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/cancel": {
+      "post": {
+        "summary": "Cancel",
+        "operationId": "cancel_api_runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunBundle"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/participants/{agent_id}/records": {
+      "get": {
+        "summary": "Participant Records",
+        "operationId": "participant_records_api_runs__run_id__participants__agent_id__records_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/Experiment-Output"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Run"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Trajectory"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Claim"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Evidence"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Decision"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Challenge"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Verification"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Checkpoint"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Memory"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Evaluation"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Annotation"
+                      },
+                      {
+                        "$ref": "#/components/schemas/CouncilMessage"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ReflectionDecision"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RunState"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TrajectoryState"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ModelCall"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RetrievalAudit"
+                      }
+                    ],
+                    "discriminator": {
+                      "propertyName": "kind",
+                      "mapping": {
+                        "experiment": "#/components/schemas/Experiment-Output",
+                        "run": "#/components/schemas/Run",
+                        "trajectory": "#/components/schemas/Trajectory",
+                        "claim": "#/components/schemas/Claim",
+                        "evidence": "#/components/schemas/Evidence",
+                        "decision": "#/components/schemas/Decision",
+                        "challenge": "#/components/schemas/Challenge",
+                        "verification": "#/components/schemas/Verification",
+                        "checkpoint": "#/components/schemas/Checkpoint",
+                        "memory": "#/components/schemas/Memory",
+                        "evaluation": "#/components/schemas/Evaluation",
+                        "annotation": "#/components/schemas/Annotation",
+                        "council_message": "#/components/schemas/CouncilMessage",
+                        "reflection_decision": "#/components/schemas/ReflectionDecision",
+                        "run_state": "#/components/schemas/RunState",
+                        "trajectory_state": "#/components/schemas/TrajectoryState",
+                        "model_call": "#/components/schemas/ModelCall",
+                        "retrieval_audit": "#/components/schemas/RetrievalAudit"
+                      }
+                    }
+                  },
+                  "title": "Response Participant Records Api Runs  Run Id  Participants  Agent Id  Records Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/memories": {
+      "post": {
+        "summary": "Propose Memory",
+        "operationId": "propose_memory_api_runs__run_id__memories_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeMemory"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Memory"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/memories/{memory_id}/validate": {
+      "post": {
+        "summary": "Validate Memory",
+        "operationId": "validate_memory_api_runs__run_id__memories__memory_id__validate_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "memory_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Memory Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Verification"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/memories/{memory_id}/transition": {
+      "post": {
+        "summary": "Transition Memory",
+        "operationId": "transition_memory_api_runs__run_id__memories__memory_id__transition_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "memory_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Memory Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitionMemory"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Memory"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/memories/query": {
+      "post": {
+        "summary": "Query Memory",
+        "operationId": "query_memory_api_runs__run_id__memories_query_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetrievalQuery"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Memory"
+                  },
+                  "title": "Response Query Memory Api Runs  Run Id  Memories Query Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounting": {
+      "get": {
+        "summary": "Accounting",
+        "operationId": "accounting_api_accounting_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Accounting Api Accounting Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounting/{operation_id}/reconcile": {
+      "post": {
+        "summary": "Reconcile",
+        "operationId": "reconcile_api_accounting__operation_id__reconcile_post",
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Operation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileCharge"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdjudicateCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "adjudicate",
+            "title": "Operation",
+            "default": "adjudicate"
+          },
+          "challenge_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Challenge Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "challenge_id"
+        ],
+        "title": "AdjudicateCommand"
+      },
+      "Agent-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelAssignment-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/Permissions-Input"
+          },
+          "memory_scope": {
+            "type": "string",
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "title": "Memory Scope",
+            "default": "private"
+          },
+          "accepted_messages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Accepted Messages",
+            "default": []
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "default": ""
+          },
+          "instruction_version": {
+            "type": "string",
+            "title": "Instruction Version",
+            "default": "1"
+          },
+          "model_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile Id"
+          },
+          "model_profile_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile Version"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "instructions"
+        ],
+        "title": "Agent"
+      },
+      "Agent-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelAssignment-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/Permissions-Output"
+          },
+          "memory_scope": {
+            "type": "string",
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "title": "Memory Scope",
+            "default": "private"
+          },
+          "accepted_messages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Accepted Messages",
+            "default": []
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "default": ""
+          },
+          "instruction_version": {
+            "type": "string",
+            "title": "Instruction Version",
+            "default": "1"
+          },
+          "model_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile Id"
+          },
+          "model_profile_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile Version"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "role",
+          "instructions",
+          "model",
+          "permissions",
+          "memory_scope",
+          "accepted_messages",
+          "display_name",
+          "instruction_version",
+          "model_profile_id",
+          "model_profile_version",
+          "enabled"
+        ],
+        "title": "Agent"
+      },
+      "AgentDefinition-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Version",
+            "default": 1
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "agent": {
+            "$ref": "#/components/schemas/Agent-Input"
+          },
+          "model_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile Id"
+          },
+          "model_profile_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile Version"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "instruction_version": {
+            "type": "string",
+            "title": "Instruction Version",
+            "default": "1"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "agent"
+        ],
+        "title": "AgentDefinition"
+      },
+      "AgentDefinition-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Version",
+            "default": 1
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "agent": {
+            "$ref": "#/components/schemas/Agent-Output"
+          },
+          "model_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile Id"
+          },
+          "model_profile_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile Version"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "instruction_version": {
+            "type": "string",
+            "title": "Instruction Version",
+            "default": "1"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "version",
+          "display_name",
+          "agent",
+          "model_profile_id",
+          "model_profile_version",
+          "enabled",
+          "instruction_version"
+        ],
+        "title": "AgentDefinition"
+      },
+      "AnnotateCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "annotate",
+            "title": "Operation",
+            "default": "annotate"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Reviewer Id"
+          },
+          "rubric_version": {
+            "type": "string",
+            "const": "trajectory-quality-v1",
+            "title": "Rubric Version",
+            "default": "trajectory-quality-v1"
+          },
+          "dimensions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Dimensions"
+          },
+          "preference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "A",
+                  "B",
+                  "tie",
+                  "neither"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preference"
+          },
+          "other_trajectory_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Trajectory Id"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "reviewer_id"
+        ],
+        "title": "AnnotateCommand"
+      },
+      "Annotation": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "type": "string",
+            "const": "human_annotation",
+            "title": "Provenance",
+            "default": "human_annotation"
+          },
+          "kind": {
+            "type": "string",
+            "const": "annotation",
+            "title": "Kind",
+            "default": "annotation"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "title": "Reviewer Id"
+          },
+          "rubric_version": {
+            "type": "string",
+            "title": "Rubric Version"
+          },
+          "subject_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Subject Id"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels",
+            "default": []
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "default": ""
+          },
+          "preferred_over_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Over Id"
+          },
+          "dimensions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Dimensions"
+          },
+          "preference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "A",
+                  "B",
+                  "tie",
+                  "neither"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preference"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "reviewer_id",
+          "rubric_version",
+          "subject_id",
+          "labels",
+          "notes",
+          "preferred_over_id",
+          "dimensions",
+          "preference"
+        ],
+        "title": "Annotation"
+      },
+      "ArtifactRef-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          },
+          "relative_path": {
+            "type": "string",
+            "pattern": "^sha256/[0-9a-f]{2}/[0-9a-f]{64}$",
+            "title": "Relative Path"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size Bytes"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type",
+            "default": "application/octet-stream"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sha256",
+          "relative_path",
+          "size_bytes"
+        ],
+        "title": "ArtifactRef"
+      },
+      "ArtifactRef-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          },
+          "relative_path": {
+            "type": "string",
+            "pattern": "^sha256/[0-9a-f]{2}/[0-9a-f]{64}$",
+            "title": "Relative Path"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size Bytes"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type",
+            "default": "application/octet-stream"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "sha256",
+          "relative_path",
+          "size_bytes",
+          "media_type"
+        ],
+        "title": "ArtifactRef"
+      },
+      "BranchComparison": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "baseline_trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Baseline Trajectory Id"
+          },
+          "treatment_trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Treatment Trajectory Id"
+          },
+          "starting_state_equivalent": {
+            "type": "boolean",
+            "title": "Starting State Equivalent"
+          },
+          "interventions": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Interventions"
+          },
+          "commitments": {
+            "items": {
+              "$ref": "#/components/schemas/CommitmentChange"
+            },
+            "type": "array",
+            "title": "Commitments"
+          },
+          "final_state_hashes": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Final State Hashes"
+          },
+          "evaluations": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Evaluation"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Evaluations"
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/Experiment-Output"
+          },
+          "caveat": {
+            "type": "string",
+            "title": "Caveat",
+            "default": "Descriptive only. Synthetic inputs are not model-performance evidence. Shared configuration does not prove causal isolation of stochastic continuations. Evaluation resources include inherited work; branch totals must not be summed."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "run_id",
+          "baseline_trajectory_id",
+          "treatment_trajectory_id",
+          "starting_state_equivalent",
+          "interventions",
+          "commitments",
+          "final_state_hashes",
+          "evaluations",
+          "configuration",
+          "caveat"
+        ],
+        "title": "BranchComparison"
+      },
+      "BudgetPolicy-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "run_cap_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 75.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Run Cap Usd",
+            "default": "1"
+          },
+          "max_model_calls": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Max Model Calls",
+            "default": 10
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Output Tokens",
+            "default": 1024
+          },
+          "max_context_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Context Tokens",
+            "default": 8192
+          },
+          "max_tool_calls": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Max Tool Calls",
+            "default": 10
+          },
+          "max_retries": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Max Retries",
+            "default": 2
+          },
+          "timeout_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout Seconds",
+            "default": 30
+          },
+          "max_reflections_per_branch": {
+            "type": "integer",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Max Reflections Per Branch",
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "BudgetPolicy"
+      },
+      "BudgetPolicy-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "run_cap_usd": {
+            "type": "string",
+            "title": "Run Cap Usd",
+            "default": "1"
+          },
+          "max_model_calls": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Max Model Calls",
+            "default": 10
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Output Tokens",
+            "default": 1024
+          },
+          "max_context_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Context Tokens",
+            "default": 8192
+          },
+          "max_tool_calls": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Max Tool Calls",
+            "default": 10
+          },
+          "max_retries": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Max Retries",
+            "default": 2
+          },
+          "timeout_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout Seconds",
+            "default": 30
+          },
+          "max_reflections_per_branch": {
+            "type": "integer",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Max Reflections Per Branch",
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "run_cap_usd",
+          "max_model_calls",
+          "max_output_tokens",
+          "max_context_tokens",
+          "max_tool_calls",
+          "max_retries",
+          "timeout_seconds",
+          "max_reflections_per_branch"
+        ],
+        "title": "BudgetPolicy"
+      },
+      "CacheFixture": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "const": "cache-policy",
+            "title": "Id",
+            "default": "cache-policy"
+          },
+          "version": {
+            "type": "string",
+            "const": "1",
+            "title": "Version",
+            "default": "1"
+          },
+          "cases": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "update",
+                "delete",
+                "read"
+              ]
+            },
+            "type": "array",
+            "title": "Cases",
+            "default": [
+              "read",
+              "update",
+              "delete"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CacheFixture"
+      },
+      "Candidate": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "policy": {
+            "type": "string",
+            "enum": [
+              "invalidate_all",
+              "stale_on_update",
+              "stale_on_delete"
+            ],
+            "title": "Policy"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "policy"
+        ],
+        "title": "Candidate"
+      },
+      "Capabilities-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "structured_output": {
+            "type": "string",
+            "enum": [
+              "native",
+              "prompted",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "Structured Output",
+            "default": "unknown"
+          },
+          "tool_calling": {
+            "type": "string",
+            "enum": [
+              "native",
+              "emulated",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "Tool Calling",
+            "default": "unknown"
+          },
+          "streaming": {
+            "type": "boolean",
+            "title": "Streaming",
+            "default": false
+          },
+          "usage_reporting": {
+            "type": "boolean",
+            "title": "Usage Reporting",
+            "default": false
+          },
+          "seed_control": {
+            "type": "boolean",
+            "title": "Seed Control",
+            "default": false
+          },
+          "cancellation": {
+            "type": "boolean",
+            "title": "Cancellation",
+            "default": false
+          },
+          "context_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Limit"
+          },
+          "cost_metadata_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Metadata Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Capabilities"
+      },
+      "Capabilities-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "structured_output": {
+            "type": "string",
+            "enum": [
+              "native",
+              "prompted",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "Structured Output",
+            "default": "unknown"
+          },
+          "tool_calling": {
+            "type": "string",
+            "enum": [
+              "native",
+              "emulated",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "Tool Calling",
+            "default": "unknown"
+          },
+          "streaming": {
+            "type": "boolean",
+            "title": "Streaming",
+            "default": false
+          },
+          "usage_reporting": {
+            "type": "boolean",
+            "title": "Usage Reporting",
+            "default": false
+          },
+          "seed_control": {
+            "type": "boolean",
+            "title": "Seed Control",
+            "default": false
+          },
+          "cancellation": {
+            "type": "boolean",
+            "title": "Cancellation",
+            "default": false
+          },
+          "context_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Limit"
+          },
+          "cost_metadata_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Metadata Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "structured_output",
+          "tool_calling",
+          "streaming",
+          "usage_reporting",
+          "seed_control",
+          "cancellation",
+          "context_limit",
+          "cost_metadata_version"
+        ],
+        "title": "Capabilities"
+      },
+      "Challenge": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "challenge",
+            "title": "Kind",
+            "default": "challenge"
+          },
+          "claim_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Claim Id"
+          },
+          "objection": {
+            "type": "string",
+            "title": "Objection"
+          },
+          "proposed_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Revision"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Evidence Ids",
+            "default": []
+          },
+          "critic_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Critic Id"
+          },
+          "alleged_cases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alleged Cases",
+            "default": []
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "response": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "accept",
+                  "reject",
+                  "qualify",
+                  "investigate",
+                  "defer"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response"
+          },
+          "responds_to_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responds To Id"
+          },
+          "target_decision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Decision Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "claim_id",
+          "objection",
+          "proposed_revision",
+          "evidence_ids",
+          "critic_id",
+          "alleged_cases",
+          "confidence",
+          "response",
+          "responds_to_id",
+          "target_decision_id"
+        ],
+        "title": "Challenge"
+      },
+      "ChallengeCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "challenge",
+            "title": "Operation",
+            "default": "challenge"
+          },
+          "claim_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Claim Id"
+          },
+          "critic_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Critic Id"
+          },
+          "objection": {
+            "type": "string",
+            "title": "Objection"
+          },
+          "alleged_cases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alleged Cases",
+            "default": []
+          },
+          "proposed_revision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Candidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "target_decision_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Decision Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "claim_id",
+          "critic_id",
+          "objection"
+        ],
+        "title": "ChallengeCommand"
+      },
+      "Checkpoint": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Kind",
+            "default": "checkpoint"
+          },
+          "task_version": {
+            "type": "string",
+            "title": "Task Version"
+          },
+          "fixture_hash": {
+            "type": "string",
+            "title": "Fixture Hash"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/ArtifactRef-Output"
+          },
+          "environment_config": {
+            "$ref": "#/components/schemas/ArtifactRef-Output"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactRef-Output"
+            },
+            "type": "array",
+            "title": "Observations",
+            "default": []
+          },
+          "memory_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Memory Ids",
+            "default": []
+          },
+          "model_configs": {
+            "items": {
+              "$ref": "#/components/schemas/ModelAssignment-Output"
+            },
+            "type": "array",
+            "title": "Model Configs",
+            "default": []
+          },
+          "event_cursor": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Event Cursor"
+          },
+          "manifest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "task_version",
+          "fixture_hash",
+          "workspace",
+          "environment_config",
+          "observations",
+          "memory_ids",
+          "model_configs",
+          "event_cursor",
+          "manifest"
+        ],
+        "title": "Checkpoint"
+      },
+      "CheckpointCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Operation",
+            "default": "checkpoint"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key"
+        ],
+        "title": "CheckpointCommand"
+      },
+      "Claim": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "claim",
+            "title": "Kind",
+            "default": "claim"
+          },
+          "proposition": {
+            "type": "string",
+            "title": "Proposition"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "contested",
+              "supported",
+              "rejected",
+              "superseded",
+              "qualified",
+              "retracted"
+            ],
+            "title": "Status",
+            "default": "proposed"
+          },
+          "commitment_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commitment Id"
+          },
+          "author_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Id"
+          },
+          "revises_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revises Id"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Evidence Ids",
+            "default": []
+          },
+          "dependency_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Dependency Ids",
+            "default": []
+          },
+          "inferred_dependency_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Inferred Dependency Ids",
+            "default": []
+          },
+          "contradicting_evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Contradicting Evidence Ids",
+            "default": []
+          },
+          "rejected_evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Rejected Evidence Ids",
+            "default": []
+          },
+          "reconsider_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Reconsider Ids",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "proposition",
+          "status",
+          "commitment_id",
+          "author_id",
+          "revises_id",
+          "evidence_ids",
+          "dependency_ids",
+          "inferred_dependency_ids",
+          "contradicting_evidence_ids",
+          "rejected_evidence_ids",
+          "reconsider_ids"
+        ],
+        "title": "Claim"
+      },
+      "ClaimCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "claim",
+            "title": "Operation",
+            "default": "claim"
+          },
+          "author_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Author Id"
+          },
+          "proposition": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Proposition"
+          },
+          "revises_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revises Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "proposed",
+              "contested",
+              "supported",
+              "qualified",
+              "retracted",
+              "superseded",
+              "rejected"
+            ],
+            "title": "Status",
+            "default": "proposed"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Evidence Ids",
+            "default": []
+          },
+          "contradicting_evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Contradicting Evidence Ids",
+            "default": []
+          },
+          "rejected_evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Rejected Evidence Ids",
+            "default": []
+          },
+          "dependency_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Dependency Ids",
+            "default": []
+          },
+          "inferred_dependency_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Inferred Dependency Ids",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "author_id",
+          "proposition"
+        ],
+        "title": "ClaimCommand"
+      },
+      "CloseBranchCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "close_branch",
+            "title": "Operation",
+            "default": "close_branch"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "abandoned"
+            ],
+            "title": "Status"
+          },
+          "reason_code": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Reason Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "status",
+          "reason_code"
+        ],
+        "title": "CloseBranchCommand"
+      },
+      "CommitmentChange": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "commitment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Commitment Id"
+          },
+          "before_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Id"
+          },
+          "after_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Id"
+          },
+          "author_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Id"
+          },
+          "added_evidence": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Added Evidence",
+            "default": []
+          },
+          "rejected_evidence": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Rejected Evidence",
+            "default": []
+          },
+          "affected_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Affected Ids",
+            "default": []
+          },
+          "before_proposition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Proposition"
+          },
+          "after_proposition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Proposition"
+          },
+          "before_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Status"
+          },
+          "after_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Status"
+          },
+          "removed_evidence": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Removed Evidence",
+            "default": []
+          },
+          "contradicting_evidence": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Contradicting Evidence",
+            "default": []
+          },
+          "declared_dependencies": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Declared Dependencies",
+            "default": []
+          },
+          "inferred_dependencies": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Inferred Dependencies",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "commitment_id",
+          "before_id",
+          "after_id",
+          "author_id",
+          "added_evidence",
+          "rejected_evidence",
+          "affected_ids",
+          "before_proposition",
+          "after_proposition",
+          "before_status",
+          "after_status",
+          "removed_evidence",
+          "contradicting_evidence",
+          "declared_dependencies",
+          "inferred_dependencies"
+        ],
+        "title": "CommitmentChange"
+      },
+      "Comparison": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "baseline_run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Baseline Run Id"
+          },
+          "treatment_run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Treatment Run Id"
+          },
+          "added_commitments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Added Commitments"
+          },
+          "removed_commitments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Removed Commitments"
+          },
+          "baseline_metrics": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Baseline Metrics"
+          },
+          "treatment_metrics": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Treatment Metrics"
+          },
+          "comparable_task_version": {
+            "type": "string",
+            "title": "Comparable Task Version"
+          },
+          "caveat": {
+            "type": "string",
+            "title": "Caveat",
+            "default": "Descriptive comparison; no causal or model-superiority inference."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "baseline_run_id",
+          "treatment_run_id",
+          "added_commitments",
+          "removed_commitments",
+          "baseline_metrics",
+          "treatment_metrics",
+          "comparable_task_version",
+          "caveat"
+        ],
+        "title": "Comparison"
+      },
+      "ConfigureRun": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "experiment": {
+            "$ref": "#/components/schemas/Experiment-Input"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ProtocolMode",
+            "default": "solo_direct"
+          },
+          "execution_kind": {
+            "type": "string",
+            "enum": [
+              "live",
+              "synthetic",
+              "replay"
+            ],
+            "title": "Execution Kind",
+            "default": "live"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "agent_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Agent Ids",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "experiment",
+          "idempotency_key"
+        ],
+        "title": "ConfigureRun"
+      },
+      "CouncilConfig-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ModelProfile-Input"
+            },
+            "type": "array",
+            "title": "Profiles",
+            "default": []
+          },
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentDefinition-Input"
+            },
+            "type": "array",
+            "title": "Agents",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CouncilConfig"
+      },
+      "CouncilConfig-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ModelProfile-Output"
+            },
+            "type": "array",
+            "title": "Profiles",
+            "default": []
+          },
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentDefinition-Output"
+            },
+            "type": "array",
+            "title": "Agents",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "profiles",
+          "agents"
+        ],
+        "title": "CouncilConfig"
+      },
+      "CouncilMessage": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "council_message",
+            "title": "Kind",
+            "default": "council_message"
+          },
+          "message_type": {
+            "type": "string",
+            "enum": [
+              "CLAIM",
+              "EVIDENCE",
+              "CHALLENGE",
+              "RESPONSE",
+              "ACTION",
+              "VERIFICATION",
+              "MEMORY_PROPOSAL",
+              "REQUEST_EVIDENCE",
+              "HANDOFF",
+              "RESOLUTION"
+            ],
+            "title": "Message Type"
+          },
+          "sender_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Sender Id"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "title": "Visibility"
+          },
+          "linked_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Linked Ids",
+            "default": []
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "message_type",
+          "sender_id",
+          "target_id",
+          "visibility",
+          "linked_ids",
+          "content"
+        ],
+        "title": "CouncilMessage"
+      },
+      "Decision": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "decision",
+            "title": "Kind",
+            "default": "decision"
+          },
+          "claim_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Claim Id"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "retain",
+              "qualify",
+              "revise",
+              "investigate",
+              "abstain"
+            ],
+            "title": "Outcome"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "verification_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Verification Ids",
+            "default": []
+          },
+          "policy_version": {
+            "type": "string",
+            "title": "Policy Version"
+          },
+          "dependency_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Dependency Ids",
+            "default": []
+          },
+          "reconsider_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Reconsider Ids",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "claim_id",
+          "outcome",
+          "reason",
+          "verification_ids",
+          "policy_version",
+          "dependency_ids",
+          "reconsider_ids"
+        ],
+        "title": "Decision"
+      },
+      "DecisionCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "decision",
+            "title": "Operation",
+            "default": "decision"
+          },
+          "claim_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Claim Id"
+          },
+          "dependency_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Dependency Ids",
+            "default": []
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "claim_id",
+          "reason"
+        ],
+        "title": "DecisionCommand"
+      },
+      "EnvironmentCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "environment",
+            "title": "Operation",
+            "default": "environment"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "initialize",
+              "read",
+              "update",
+              "delete",
+              "select_policy"
+            ],
+            "title": "Action"
+          },
+          "candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Candidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "default": "x"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "action"
+        ],
+        "title": "EnvironmentCommand"
+      },
+      "EvaluateCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "evaluate",
+            "title": "Operation",
+            "default": "evaluate"
+          },
+          "baseline_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline Run Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key"
+        ],
+        "title": "EvaluateCommand"
+      },
+      "Evaluation": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "evaluation",
+            "title": "Kind",
+            "default": "evaluation"
+          },
+          "evaluator_version": {
+            "type": "string",
+            "title": "Evaluator Version"
+          },
+          "baseline_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline Run Id"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Metrics"
+          },
+          "denominators": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Denominators"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "evaluator_version",
+          "baseline_run_id",
+          "metrics",
+          "denominators",
+          "usage"
+        ],
+        "title": "Evaluation"
+      },
+      "Event": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Sequence"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "type": {
+            "$ref": "#/components/schemas/EventType"
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "actor_role": {
+            "$ref": "#/components/schemas/Role",
+            "default": "orchestrator"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance",
+            "default": "system_inference"
+          },
+          "parent_event_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Parent Event Ids",
+            "default": []
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelAssignment-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactRef-Output"
+            },
+            "type": "array",
+            "title": "Artifacts",
+            "default": []
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "payload": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Experiment-Output"
+                },
+                {
+                  "$ref": "#/components/schemas/Run"
+                },
+                {
+                  "$ref": "#/components/schemas/Trajectory"
+                },
+                {
+                  "$ref": "#/components/schemas/Claim"
+                },
+                {
+                  "$ref": "#/components/schemas/Evidence"
+                },
+                {
+                  "$ref": "#/components/schemas/Decision"
+                },
+                {
+                  "$ref": "#/components/schemas/Challenge"
+                },
+                {
+                  "$ref": "#/components/schemas/Verification"
+                },
+                {
+                  "$ref": "#/components/schemas/Checkpoint"
+                },
+                {
+                  "$ref": "#/components/schemas/Memory"
+                },
+                {
+                  "$ref": "#/components/schemas/Evaluation"
+                },
+                {
+                  "$ref": "#/components/schemas/Annotation"
+                },
+                {
+                  "$ref": "#/components/schemas/CouncilMessage"
+                },
+                {
+                  "$ref": "#/components/schemas/ReflectionDecision"
+                },
+                {
+                  "$ref": "#/components/schemas/RunState"
+                },
+                {
+                  "$ref": "#/components/schemas/TrajectoryState"
+                },
+                {
+                  "$ref": "#/components/schemas/ModelCall"
+                },
+                {
+                  "$ref": "#/components/schemas/RetrievalAudit"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "annotation": "#/components/schemas/Annotation",
+                  "challenge": "#/components/schemas/Challenge",
+                  "checkpoint": "#/components/schemas/Checkpoint",
+                  "claim": "#/components/schemas/Claim",
+                  "council_message": "#/components/schemas/CouncilMessage",
+                  "decision": "#/components/schemas/Decision",
+                  "evaluation": "#/components/schemas/Evaluation",
+                  "evidence": "#/components/schemas/Evidence",
+                  "experiment": "#/components/schemas/Experiment-Output",
+                  "memory": "#/components/schemas/Memory",
+                  "model_call": "#/components/schemas/ModelCall",
+                  "reflection_decision": "#/components/schemas/ReflectionDecision",
+                  "retrieval_audit": "#/components/schemas/RetrievalAudit",
+                  "run": "#/components/schemas/Run",
+                  "run_state": "#/components/schemas/RunState",
+                  "trajectory": "#/components/schemas/Trajectory",
+                  "trajectory_state": "#/components/schemas/TrajectoryState",
+                  "verification": "#/components/schemas/Verification"
+                }
+              }
+            },
+            "type": "array",
+            "title": "Payload",
+            "default": []
+          },
+          "command_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Digest"
+          },
+          "expected_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Cursor"
+          },
+          "expected_trajectory_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Trajectory Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "sequence",
+          "timestamp",
+          "type",
+          "actor_id",
+          "actor_role",
+          "provenance",
+          "parent_event_ids",
+          "model",
+          "artifacts",
+          "idempotency_key",
+          "payload",
+          "command_digest",
+          "expected_cursor",
+          "expected_trajectory_id"
+        ],
+        "title": "Event"
+      },
+      "EventType": {
+        "type": "string",
+        "enum": [
+          "RUN_STARTED",
+          "RUN_CANCELLED",
+          "RUN_FAILED",
+          "MODEL_CALL_RECORDED",
+          "RETRIEVAL_RECORDED",
+          "EXPERIMENT_STARTED",
+          "RUN_CREATED",
+          "AGENT_CONFIGURED",
+          "ENVIRONMENT_INITIALIZED",
+          "OBSERVATION_RECEIVED",
+          "CLAIM_PROPOSED",
+          "CLAIM_REVISED",
+          "EVIDENCE_ATTACHED",
+          "DECISION_RECORDED",
+          "ACTION_REQUESTED",
+          "ACTION_EXECUTED",
+          "TOOL_RESULT_OBSERVED",
+          "CHECKPOINT_CREATED",
+          "CHALLENGE_SUBMITTED",
+          "CHALLENGE_RESPONDED",
+          "VERIFICATION_RECORDED",
+          "ADJUDICATION_RECORDED",
+          "REFLECTION_TRIGGERED",
+          "REFLECTION_SKIPPED",
+          "ROLLBACK_REQUESTED",
+          "CHECKPOINT_RESTORED",
+          "BRANCH_CREATED",
+          "MEMORY_PROPOSED",
+          "MEMORY_STATUS_CHANGED",
+          "TRAJECTORY_COMPLETED",
+          "EVALUATION_RECORDED",
+          "HUMAN_ANNOTATION_ADDED",
+          "PROVIDER_FAILED",
+          "RUN_CLOSED"
+        ],
+        "title": "EventType"
+      },
+      "Evidence": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "evidence",
+            "title": "Kind",
+            "default": "evidence"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactRef-Output"
+            },
+            "type": "array",
+            "title": "Artifacts",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "description",
+          "source",
+          "artifacts"
+        ],
+        "title": "Evidence"
+      },
+      "EvidenceCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "evidence",
+            "title": "Operation",
+            "default": "evidence"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactRef-Input"
+            },
+            "type": "array",
+            "title": "Artifacts",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "description",
+          "source"
+        ],
+        "title": "EvidenceCommand"
+      },
+      "ExecuteTask": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "fixture": {
+            "$ref": "#/components/schemas/CacheFixture"
+          },
+          "synthetic_answers": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "type": "object",
+            "title": "Synthetic Answers"
+          },
+          "authorize_paid": {
+            "type": "boolean",
+            "title": "Authorize Paid",
+            "default": false
+          },
+          "upper_bound_usd_per_attempt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 25.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upper Bound Usd Per Attempt"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ExecuteTask"
+      },
+      "Experiment-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "kind": {
+            "type": "string",
+            "const": "experiment",
+            "title": "Kind",
+            "default": "experiment"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "task_version": {
+            "type": "string",
+            "title": "Task Version"
+          },
+          "environment_version": {
+            "type": "string",
+            "title": "Environment Version"
+          },
+          "policy_version": {
+            "type": "string",
+            "title": "Policy Version"
+          },
+          "evaluator_version": {
+            "type": "string",
+            "title": "Evaluator Version"
+          },
+          "initial_snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Snapshot"
+          },
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/Agent-Input"
+            },
+            "type": "array",
+            "title": "Agents",
+            "default": []
+          },
+          "budget": {
+            "$ref": "#/components/schemas/BudgetPolicy-Input"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "task_id",
+          "task_version",
+          "environment_version",
+          "policy_version",
+          "evaluator_version"
+        ],
+        "title": "Experiment"
+      },
+      "Experiment-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "kind": {
+            "type": "string",
+            "const": "experiment",
+            "title": "Kind",
+            "default": "experiment"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "task_version": {
+            "type": "string",
+            "title": "Task Version"
+          },
+          "environment_version": {
+            "type": "string",
+            "title": "Environment Version"
+          },
+          "policy_version": {
+            "type": "string",
+            "title": "Policy Version"
+          },
+          "evaluator_version": {
+            "type": "string",
+            "title": "Evaluator Version"
+          },
+          "initial_snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Snapshot"
+          },
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/Agent-Output"
+            },
+            "type": "array",
+            "title": "Agents",
+            "default": []
+          },
+          "budget": {
+            "$ref": "#/components/schemas/BudgetPolicy-Output"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "kind",
+          "id",
+          "name",
+          "task_id",
+          "task_version",
+          "environment_version",
+          "policy_version",
+          "evaluator_version",
+          "initial_snapshot",
+          "agents",
+          "budget"
+        ],
+        "title": "Experiment"
+      },
+      "ForkCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "fork",
+            "title": "Operation",
+            "default": "fork"
+          },
+          "checkpoint_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Checkpoint Id"
+          },
+          "intervention": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Intervention"
+          },
+          "continuation": {
+            "type": "string",
+            "enum": [
+              "historical_replay",
+              "fresh_execution"
+            ],
+            "title": "Continuation",
+            "default": "fresh_execution"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "checkpoint_id",
+          "intervention"
+        ],
+        "title": "ForkCommand"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "JsonValue": {},
+      "LifecycleCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "lifecycle",
+            "title": "Operation",
+            "default": "lifecycle"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "reason_code": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Reason Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "status",
+          "reason_code"
+        ],
+        "title": "LifecycleCommand"
+      },
+      "Memory": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "memory",
+            "title": "Kind",
+            "default": "memory"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "title": "Scope",
+            "default": "private"
+          },
+          "owner_agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Agent Id"
+          },
+          "trust": {
+            "type": "string",
+            "enum": [
+              "quarantined",
+              "approved",
+              "rejected",
+              "revoked"
+            ],
+            "title": "Trust",
+            "default": "quarantined"
+          },
+          "source_event_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Event Id"
+          },
+          "validation_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Validation Ids",
+            "default": []
+          },
+          "eligibility": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Eligibility",
+            "default": []
+          },
+          "revises_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revises Id"
+          },
+          "memory_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Id"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "episodic",
+              "semantic",
+              "procedural",
+              "reflective"
+            ],
+            "title": "Category",
+            "default": "semantic"
+          },
+          "branch_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Branch Ids",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "text",
+          "scope",
+          "owner_agent_id",
+          "trust",
+          "source_event_id",
+          "validation_ids",
+          "eligibility",
+          "revises_id",
+          "memory_id",
+          "category",
+          "branch_ids"
+        ],
+        "title": "Memory"
+      },
+      "ModelAssignment-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "settings": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Settings"
+          },
+          "instruction_version": {
+            "type": "string",
+            "title": "Instruction Version"
+          },
+          "pricing_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pricing Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "model_id",
+          "instruction_version"
+        ],
+        "title": "ModelAssignment"
+      },
+      "ModelAssignment-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "settings": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Settings"
+          },
+          "instruction_version": {
+            "type": "string",
+            "title": "Instruction Version"
+          },
+          "pricing_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pricing Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "provider",
+          "model_id",
+          "settings",
+          "instruction_version",
+          "pricing_version"
+        ],
+        "title": "ModelAssignment"
+      },
+      "ModelCall": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "model_call",
+            "title": "Kind",
+            "default": "model_call"
+          },
+          "call_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Call Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "assignment": {
+            "$ref": "#/components/schemas/ModelAssignment-Output"
+          },
+          "response_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Id"
+          },
+          "reported_model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Model Id"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/Usage"
+          },
+          "error_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Category"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "failed",
+              "uncertain"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "call_id",
+          "agent_id",
+          "assignment",
+          "response_id",
+          "reported_model_id",
+          "usage",
+          "error_category",
+          "status"
+        ],
+        "title": "ModelCall"
+      },
+      "ModelProfile-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Version",
+            "default": 1
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "runpod",
+              "openai_compatible"
+            ],
+            "title": "Provider"
+          },
+          "model_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Model Id"
+          },
+          "endpoint_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint Id"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "credential_env": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "title": "Credential Env",
+            "default": "RUNPOD_API_KEY"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/Capabilities-Input"
+          },
+          "temperature": {
+            "type": "number",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "default": 0
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "maximum": 16384.0,
+            "minimum": 1.0,
+            "title": "Max Output Tokens",
+            "default": 256
+          },
+          "max_context_tokens": {
+            "type": "integer",
+            "maximum": 131072.0,
+            "minimum": 1.0,
+            "title": "Max Context Tokens",
+            "default": 4096
+          },
+          "timeout_seconds": {
+            "type": "number",
+            "maximum": 300.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout Seconds",
+            "default": 30
+          },
+          "retries": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Retries",
+            "default": 0
+          },
+          "concurrency": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Concurrency",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "provider",
+          "model_id"
+        ],
+        "title": "ModelProfile"
+      },
+      "ModelProfile-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Version",
+            "default": 1
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "runpod",
+              "openai_compatible"
+            ],
+            "title": "Provider"
+          },
+          "model_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Model Id"
+          },
+          "endpoint_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint Id"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "credential_env": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "title": "Credential Env",
+            "default": "RUNPOD_API_KEY"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/Capabilities-Output"
+          },
+          "temperature": {
+            "type": "number",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "default": 0
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "maximum": 16384.0,
+            "minimum": 1.0,
+            "title": "Max Output Tokens",
+            "default": 256
+          },
+          "max_context_tokens": {
+            "type": "integer",
+            "maximum": 131072.0,
+            "minimum": 1.0,
+            "title": "Max Context Tokens",
+            "default": 4096
+          },
+          "timeout_seconds": {
+            "type": "number",
+            "maximum": 300.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout Seconds",
+            "default": 30
+          },
+          "retries": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Retries",
+            "default": 0
+          },
+          "concurrency": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Concurrency",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "version",
+          "provider",
+          "model_id",
+          "endpoint_id",
+          "base_url",
+          "credential_env",
+          "enabled",
+          "capabilities",
+          "temperature",
+          "max_output_tokens",
+          "max_context_tokens",
+          "timeout_seconds",
+          "retries",
+          "concurrency"
+        ],
+        "title": "ModelProfile"
+      },
+      "Permissions-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "allowed_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Tools",
+            "default": []
+          },
+          "remote_inference": {
+            "type": "boolean",
+            "title": "Remote Inference",
+            "default": false
+          },
+          "share_memory": {
+            "type": "boolean",
+            "title": "Share Memory",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Permissions"
+      },
+      "Permissions-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "allowed_tools": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Tools",
+            "default": []
+          },
+          "remote_inference": {
+            "type": "boolean",
+            "title": "Remote Inference",
+            "default": false
+          },
+          "share_memory": {
+            "type": "boolean",
+            "title": "Share Memory",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "allowed_tools",
+          "remote_inference",
+          "share_memory"
+        ],
+        "title": "Permissions"
+      },
+      "ProposeMemory": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "title": "Scope",
+            "default": "private"
+          },
+          "owner_agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Agent Id"
+          },
+          "eligibility": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Eligibility",
+            "default": []
+          },
+          "revises_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revises Id"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "episodic",
+              "semantic",
+              "procedural",
+              "reflective"
+            ],
+            "title": "Category",
+            "default": "semantic"
+          },
+          "trajectory_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trajectory Id"
+          },
+          "source_event_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Event Id"
+          },
+          "branch_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Branch Ids",
+            "default": []
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "idempotency_key"
+        ],
+        "title": "ProposeMemory"
+      },
+      "ProtocolMode": {
+        "type": "string",
+        "enum": [
+          "solo_direct",
+          "solo_deliberative",
+          "collaborative_multi_agent",
+          "adversarial_multi_agent"
+        ],
+        "title": "ProtocolMode"
+      },
+      "Provenance": {
+        "type": "string",
+        "enum": [
+          "model_output",
+          "tool_observation",
+          "deterministic_verifier",
+          "task_answer_key",
+          "human_annotation",
+          "imported_source",
+          "system_inference",
+          "llm_evaluator"
+        ],
+        "title": "Provenance"
+      },
+      "ReconcileCharge": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "billed_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Billed Usd"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "billed_usd"
+        ],
+        "title": "ReconcileCharge"
+      },
+      "ReflectCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "reflect",
+            "title": "Operation",
+            "default": "reflect"
+          },
+          "trigger_event_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trigger Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "trigger_event_id"
+        ],
+        "title": "ReflectCommand"
+      },
+      "ReflectionDecision": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "reflection_decision",
+            "title": "Kind",
+            "default": "reflection_decision"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "continue",
+              "verify",
+              "retrieve",
+              "critique",
+              "reflect",
+              "rollback",
+              "fork",
+              "escalate",
+              "stop"
+            ],
+            "title": "Action"
+          },
+          "trigger_event_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trigger Event Id"
+          },
+          "reason_code": {
+            "type": "string",
+            "title": "Reason Code"
+          },
+          "policy_version": {
+            "type": "string",
+            "title": "Policy Version"
+          },
+          "skipped": {
+            "type": "boolean",
+            "title": "Skipped",
+            "default": false
+          },
+          "signal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal"
+          },
+          "budget_before": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Budget Before"
+          },
+          "budget_after": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Budget After"
+          },
+          "resulting_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resulting State"
+          },
+          "considered_actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Considered Actions",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "action",
+          "trigger_event_id",
+          "reason_code",
+          "policy_version",
+          "skipped",
+          "signal",
+          "budget_before",
+          "budget_after",
+          "resulting_state",
+          "considered_actions"
+        ],
+        "title": "ReflectionDecision"
+      },
+      "RespondCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "respond",
+            "title": "Operation",
+            "default": "respond"
+          },
+          "challenge_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Challenge Id"
+          },
+          "author_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Author Id"
+          },
+          "response": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "reject",
+              "qualify",
+              "investigate",
+              "defer"
+            ],
+            "title": "Response"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "challenge_id",
+          "author_id",
+          "response"
+        ],
+        "title": "RespondCommand"
+      },
+      "RetrievalAudit": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "retrieval_audit",
+            "title": "Kind",
+            "default": "retrieval_audit"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend"
+          },
+          "index_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Version"
+          },
+          "candidate_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Candidate Ids",
+            "default": []
+          },
+          "eligible_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Eligible Ids",
+            "default": []
+          },
+          "rejected_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Rejected Ids",
+            "default": []
+          },
+          "latency_seconds": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Latency Seconds"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "fallback_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Reason"
+          },
+          "conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Conditions",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "agent_id",
+          "query",
+          "backend",
+          "index_version",
+          "candidate_ids",
+          "eligible_ids",
+          "rejected_ids",
+          "latency_seconds",
+          "cost_usd",
+          "fallback_reason",
+          "conditions"
+        ],
+        "title": "RetrievalAudit"
+      },
+      "RetrievalQuery": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Query"
+          },
+          "conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Conditions",
+            "default": []
+          },
+          "backend": {
+            "type": "string",
+            "enum": [
+              "local",
+              "moss"
+            ],
+            "title": "Backend",
+            "default": "local"
+          },
+          "authorize_paid": {
+            "type": "boolean",
+            "title": "Authorize Paid",
+            "default": false
+          },
+          "authorize_private_upload": {
+            "type": "boolean",
+            "title": "Authorize Private Upload",
+            "default": false
+          },
+          "upper_bound_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 75.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upper Bound Usd"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_id",
+          "query",
+          "idempotency_key"
+        ],
+        "title": "RetrievalQuery"
+      },
+      "Role": {
+        "type": "string",
+        "enum": [
+          "executor",
+          "skeptic",
+          "researcher",
+          "archivist",
+          "orchestrator",
+          "independent_verifier"
+        ],
+        "title": "Role"
+      },
+      "Run": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "kind": {
+            "type": "string",
+            "const": "run",
+            "title": "Kind",
+            "default": "run"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ProtocolMode"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "configured",
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "default": "configured"
+          },
+          "execution_kind": {
+            "type": "string",
+            "enum": [
+              "live",
+              "synthetic",
+              "replay"
+            ],
+            "title": "Execution Kind",
+            "default": "live"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "kind",
+          "id",
+          "experiment_id",
+          "mode",
+          "status",
+          "execution_kind"
+        ],
+        "title": "Run"
+      },
+      "RunBundle": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "run": {
+            "$ref": "#/components/schemas/Run"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "accounting": {
+            "items": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Accounting",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "run",
+          "events",
+          "accounting"
+        ],
+        "title": "RunBundle"
+      },
+      "RunState": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "run_state",
+            "title": "Kind",
+            "default": "run_state"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status"
+          },
+          "reason_code": {
+            "type": "string",
+            "title": "Reason Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "status",
+          "reason_code"
+        ],
+        "title": "RunState"
+      },
+      "Trajectory": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "kind": {
+            "type": "string",
+            "const": "trajectory",
+            "title": "Kind",
+            "default": "trajectory"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "fork_event_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fork Event Id"
+          },
+          "checkpoint_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint Id"
+          },
+          "intervention": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intervention"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "kind",
+          "id",
+          "run_id",
+          "parent_id",
+          "fork_event_id",
+          "checkpoint_id",
+          "intervention"
+        ],
+        "title": "Trajectory"
+      },
+      "TrajectoryState": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "trajectory_state",
+            "title": "Kind",
+            "default": "trajectory_state"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "abandoned"
+            ],
+            "title": "Status"
+          },
+          "reason_code": {
+            "type": "string",
+            "title": "Reason Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "status",
+          "reason_code"
+        ],
+        "title": "TrajectoryState"
+      },
+      "TransitionMemory": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "trust": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected",
+              "revoked"
+            ],
+            "title": "Trust"
+          },
+          "validation_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Validation Ids",
+            "default": []
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "trust",
+          "idempotency_key"
+        ],
+        "title": "TransitionMemory"
+      },
+      "Usage": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "estimated_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Usd"
+          },
+          "billed_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Billed Usd"
+          },
+          "pricing_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pricing Version"
+          },
+          "latency_seconds": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Seconds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "input_tokens",
+          "output_tokens",
+          "estimated_usd",
+          "billed_usd",
+          "pricing_version",
+          "latency_seconds"
+        ],
+        "title": "Usage"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Verification": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "verification",
+            "title": "Kind",
+            "default": "verification"
+          },
+          "subject_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Subject Id"
+          },
+          "evaluator_id": {
+            "type": "string",
+            "title": "Evaluator Id"
+          },
+          "evaluator_version": {
+            "type": "string",
+            "title": "Evaluator Version"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "valid",
+              "invalid",
+              "partially_valid",
+              "unverified"
+            ],
+            "title": "Verdict"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Evidence Ids",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "subject_id",
+          "evaluator_id",
+          "evaluator_version",
+          "verdict",
+          "evidence_ids"
+        ],
+        "title": "Verification"
+      },
+      "VerifyCommand": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "operation": {
+            "type": "string",
+            "const": "verify",
+            "title": "Operation",
+            "default": "verify"
+          },
+          "claim_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Claim Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "claim_id"
+        ],
+        "title": "VerifyCommand"
+      }
+    }
+  }
+}

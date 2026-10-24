@@ -1,0 +1,35 @@
+name: Foundation checks
+on: [push, pull_request]
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.12', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e '.[dev]'
+      - run: ruff check .
+      - run: mypy
+      - run: pytest
+      - run: python scripts/export_contracts.py
+      - run: git diff --exit-code docs/contracts
+  studio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - run: npm ci
+        working-directory: studio
+      - run: npm run types:generate
+        working-directory: studio
+      - run: git diff --exit-code studio/src/api.generated.ts
+      - run: npm run build
+        working-directory: studio

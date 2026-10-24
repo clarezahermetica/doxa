@@ -1,0 +1,18 @@
+{
+  "agents": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "version": 2,
+      "display_name": "Executor A",
+      "instruction_version": "cache-policy-v1",
+      "model_profile_id": "runpod-profile",
+      "model_profile_version": 1,
+      "agent": {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "role": "executor",
+        "instructions": "Select one cache policy and return only the requested JSON object.",
+        "permissions": { "remote_inference": true }
+      }
+    }
+  ]
+}

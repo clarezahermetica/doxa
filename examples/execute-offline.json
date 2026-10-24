@@ -1,0 +1,9 @@
+{
+  "synthetic_answers": {
+    "executor": { "policy": "stale_on_update" },
+    "skeptic": { "policy": "invalidate_all" },
+    "researcher": { "policy": "invalidate_all" },
+    "defender": { "policy": "invalidate_all" }
+  },
+  "authorize_paid": false
+}
