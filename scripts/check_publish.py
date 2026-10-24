@@ -18,6 +18,9 @@ known = [value.encode() for value in secret_values()]
 patterns = {
     "Moss token": rb"moss_[A-Za-z0-9]{24,}",
     "GitHub token": rb"gh[pousr]_[A-Za-z0-9]{24,}",
+    "GitHub fine-grained token": rb"github_pat_[A-Za-z0-9_]{24,}",
+    "RunPod token": rb"rpa_[A-Za-z0-9_-]{24,}",
+    "Hugging Face token": rb"hf_[A-Za-z0-9]{24,}",
     "private key": rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
     "AWS access ID": rb"AKIA[A-Z0-9]{16}",
     "provider secret": rb"sk-(?:proj-|ant-)?[A-Za-z0-9_-]{24,}",

@@ -35,6 +35,15 @@ class CacheIndependentVerifier:
         fixture = CacheFixture.model_validate_json(self.store.get(task.fixture))
         candidate = Candidate.model_validate_json(self.store.get(artifact))
         results = verify(fixture, candidate)
+        report = {
+            "task_id": task.id,
+            "task_version": task.version,
+            "environment_version": task.environment,
+            "evaluator_id": "cache-oracle",
+            "evaluator_version": "2",
+            "candidate_sha256": artifact.sha256,
+            "checks": results,
+        }
         self.evidence = Evidence(
             experiment_id=self.experiment_id,
             run_id=self.run_id,
@@ -42,7 +51,7 @@ class CacheIndependentVerifier:
             provenance=Provenance.DETERMINISTIC_VERIFIER,
             description=json.dumps(results),
             source="cache-independent-verifier-v2",
-            artifacts=(self.store.put(json.dumps(results).encode(), "application/json"),),
+            artifacts=(self.store.put(json.dumps(report).encode(), "application/json"),),
         )
         # Caller persists evidence and verdict atomically. This port does not write history.
         return Verification(

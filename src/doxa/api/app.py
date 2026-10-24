@@ -16,9 +16,11 @@ from doxa.core.execution import ExecuteTask
 from doxa.core.memory_commands import ProposeMemory, TransitionMemory
 from doxa.core.models import Contract, Event, Memory, Record, Run, Verification
 from doxa.core.profiles import CouncilConfig
+from doxa.core.readiness import InstallationReadiness, inspect_readiness
 from doxa.core.research_commands import Command
 from doxa.core.retrieval_commands import RetrievalQuery
 from doxa.core.retrieval_commands import query as retrieval_query
+from doxa.providers.registry import ConfigurationReport, ProviderDescriptor
 from doxa.storage.budget import BudgetStore
 from doxa.storage.ledger import LedgerConflict
 
@@ -41,6 +43,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         controller.initialize()
         yield
+        # Closing the local API cancels its waits and persists cancellation; this
+        # is not a claim that remote jobs/billing have been canceled.
+        active = list(tasks.items())
+        for run_id, task in active:
+            if controller.inspect(run_id).run.status == "running":
+                controller.cancel(run_id)
+            task.cancel()
+        if active:
+            await asyncio.gather(*(task for _, task in active), return_exceptions=True)
 
     app = FastAPI(title="DOXA foundation", version="0.1.0a0", lifespan=lifespan)
     app.add_middleware(
@@ -55,6 +66,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/configuration", response_model=CouncilConfig)
     def configuration() -> CouncilConfig:
         return controller.configuration()
+
+    @app.get("/api/readiness", response_model=InstallationReadiness)
+    def readiness() -> InstallationReadiness:
+        return inspect_readiness(controller)
+
+    @app.get("/api/providers", response_model=list[ProviderDescriptor])
+    def providers() -> list[ProviderDescriptor]:
+        return list(controller.provider_catalog())
+
+    @app.post("/api/configuration/validate", response_model=ConfigurationReport)
+    def validate_configuration(config: CouncilConfig | None = None) -> ConfigurationReport:
+        return controller.validate_configuration(config)
 
     @app.post("/api/configuration", status_code=204)
     def save_configuration(config: CouncilConfig) -> None:
@@ -97,6 +120,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/runs/{run_id}/execute")
     async def execute(run_id: UUID, command: ExecuteTask | None = None) -> RunBundle | None:
         try:
+            if run_id in tasks:
+                raise HTTPException(409, "Run already has an active local executor")
             if command is None:
                 controller.execute(run_id)
                 return None
@@ -121,6 +146,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if task:
             task.cancel()
         return bundle
+
+    @app.post("/api/runs/{run_id}/recover", response_model=RunBundle)
+    def recover(run_id: UUID) -> RunBundle:
+        return controller.recover_run(run_id)
 
     @app.get("/api/runs/{run_id}/participants/{agent_id}/records", response_model=list[Record])
     def participant_records(run_id: UUID, agent_id: UUID) -> list[Record]:
@@ -148,7 +177,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/accounting/{operation_id}/reconcile", status_code=204)
     def reconcile(operation_id: UUID, command: ReconcileCharge) -> None:
-        BudgetStore(controller.settings.database_path).reconcile(operation_id, command.billed_usd)
+        controller.reconcile_charge(operation_id, command.billed_usd)
 
     # Local operator API; participant views constrain context, not authentication identity.
     from fastapi.responses import JSONResponse

@@ -37,3 +37,8 @@ service-account*.json
 .cache/
 private/
 exports/
+.model-cache/
+.huggingface/
+.hf/
+tmp/
+temp/

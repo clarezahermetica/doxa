@@ -74,6 +74,91 @@
         }
       }
     },
+    "/api/readiness": {
+      "get": {
+        "summary": "Readiness",
+        "operationId": "readiness_api_readiness_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallationReadiness"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/providers": {
+      "get": {
+        "summary": "Providers",
+        "operationId": "providers_api_providers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderDescriptor"
+                  },
+                  "type": "array",
+                  "title": "Response Providers Api Providers Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/configuration/validate": {
+      "post": {
+        "summary": "Validate Configuration",
+        "operationId": "validate_configuration_api_configuration_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/CouncilConfig-Input"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Config"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs": {
       "get": {
         "summary": "Runs",
@@ -518,6 +603,46 @@
       "post": {
         "summary": "Cancel",
         "operationId": "cancel_api_runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunBundle"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/recover": {
+      "post": {
+        "summary": "Recover",
+        "operationId": "recover_api_runs__run_id__recover_post",
         "parameters": [
           {
             "name": "run_id",
@@ -3109,6 +3234,43 @@
         ],
         "title": "Comparison"
       },
+      "ConfigurationReport": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileReadiness"
+            },
+            "type": "array",
+            "title": "Profiles"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "valid",
+          "issues",
+          "profiles"
+        ],
+        "title": "ConfigurationReport"
+      },
       "ConfigureRun": {
         "properties": {
           "schema_version": {
@@ -4359,6 +4521,50 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "InstallationReadiness": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": "local_only"
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/ConfigurationReport"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderDescriptor"
+            },
+            "type": "array",
+            "title": "Providers"
+          },
+          "sandbox": {
+            "$ref": "#/components/schemas/SandboxStatus"
+          },
+          "external_probe_performed": {
+            "type": "boolean",
+            "title": "External Probe Performed",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "mode",
+          "configuration",
+          "providers",
+          "sandbox",
+          "external_probe_performed"
+        ],
+        "title": "InstallationReadiness"
+      },
       "JsonValue": {},
       "LifecycleCommand": {
         "properties": {
@@ -4761,6 +4967,35 @@
               "uncertain"
             ],
             "title": "Status"
+          },
+          "request_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Hash"
+          },
+          "request_settings": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Request Settings"
+          },
+          "billing_uncertain": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Billing Uncertain"
           }
         },
         "additionalProperties": false,
@@ -4780,7 +5015,10 @@
           "reported_model_id",
           "usage",
           "error_category",
-          "status"
+          "status",
+          "request_hash",
+          "request_settings",
+          "billing_uncertain"
         ],
         "title": "ModelCall"
       },
@@ -4873,6 +5111,13 @@
             "title": "Max Context Tokens",
             "default": 4096
           },
+          "max_input_bytes": {
+            "type": "integer",
+            "maximum": 524288.0,
+            "minimum": 1.0,
+            "title": "Max Input Bytes",
+            "default": 4096
+          },
           "timeout_seconds": {
             "type": "number",
             "maximum": 300.0,
@@ -4893,6 +5138,16 @@
             "minimum": 1.0,
             "title": "Concurrency",
             "default": 1
+          },
+          "pricing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PricingMetadata-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -4993,6 +5248,13 @@
             "title": "Max Context Tokens",
             "default": 4096
           },
+          "max_input_bytes": {
+            "type": "integer",
+            "maximum": 524288.0,
+            "minimum": 1.0,
+            "title": "Max Input Bytes",
+            "default": 4096
+          },
           "timeout_seconds": {
             "type": "number",
             "maximum": 300.0,
@@ -5013,6 +5275,16 @@
             "minimum": 1.0,
             "title": "Concurrency",
             "default": 1
+          },
+          "pricing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PricingMetadata-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -5031,9 +5303,11 @@
           "temperature",
           "max_output_tokens",
           "max_context_tokens",
+          "max_input_bytes",
           "timeout_seconds",
           "retries",
-          "concurrency"
+          "concurrency",
+          "pricing"
         ],
         "title": "ModelProfile"
       },
@@ -5104,6 +5378,248 @@
           "share_memory"
         ],
         "title": "Permissions"
+      },
+      "PricingMetadata-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Version"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Source"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "token",
+              "complete_operation"
+            ],
+            "title": "Kind"
+          },
+          "input_usd_per_million": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Usd Per Million"
+          },
+          "output_usd_per_million": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Usd Per Million"
+          },
+          "complete_operation_upper_bound_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 75.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Complete Operation Upper Bound Usd"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "source",
+          "kind"
+        ],
+        "title": "PricingMetadata"
+      },
+      "PricingMetadata-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Version"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Source"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "token",
+              "complete_operation"
+            ],
+            "title": "Kind"
+          },
+          "input_usd_per_million": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Usd Per Million"
+          },
+          "output_usd_per_million": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Usd Per Million"
+          },
+          "complete_operation_upper_bound_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Complete Operation Upper Bound Usd"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "version",
+          "source",
+          "kind",
+          "input_usd_per_million",
+          "output_usd_per_million",
+          "complete_operation_upper_bound_usd"
+        ],
+        "title": "PricingMetadata"
+      },
+      "ProfileReadiness": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "not_ready",
+              "ready_for_authorized_test"
+            ],
+            "title": "Status"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "default": []
+          },
+          "credential_env": {
+            "type": "string",
+            "title": "Credential Env"
+          },
+          "credential_present": {
+            "type": "boolean",
+            "title": "Credential Present"
+          },
+          "remote_verified": {
+            "type": "boolean",
+            "const": false,
+            "title": "Remote Verified",
+            "default": false
+          },
+          "credit_balance_usd": {
+            "type": "null",
+            "title": "Credit Balance Usd"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "profile_id",
+          "version",
+          "provider",
+          "model_id",
+          "status",
+          "issues",
+          "warnings",
+          "credential_env",
+          "credential_present",
+          "remote_verified",
+          "credit_balance_usd"
+        ],
+        "title": "ProfileReadiness"
       },
       "ProposeMemory": {
         "properties": {
@@ -5242,6 +5758,36 @@
           "llm_evaluator"
         ],
         "title": "Provenance"
+      },
+      "ProviderDescriptor": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "implemented": {
+            "type": "boolean",
+            "title": "Implemented"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/Capabilities-Output"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "provider",
+          "implemented",
+          "capabilities"
+        ],
+        "title": "ProviderDescriptor"
       },
       "ReconcileCharge": {
         "properties": {
@@ -5932,6 +6478,38 @@
           "reason_code"
         ],
         "title": "RunState"
+      },
+      "SandboxStatus": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "execution_enabled": {
+            "type": "boolean",
+            "title": "Execution Enabled",
+            "default": false
+          },
+          "runtime_detected": {
+            "type": "boolean",
+            "title": "Runtime Detected"
+          },
+          "prerequisite": {
+            "type": "string",
+            "title": "Prerequisite"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "execution_enabled",
+          "runtime_detected",
+          "prerequisite"
+        ],
+        "title": "SandboxStatus"
       },
       "Trajectory": {
         "properties": {

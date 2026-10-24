@@ -2,10 +2,11 @@ import asyncio
 import json
 from decimal import Decimal
 from pathlib import Path
+from typing import Any, cast
 from uuid import UUID
 
 import typer
-from pydantic import TypeAdapter
+from pydantic import BaseModel, TypeAdapter
 
 from doxa.core.config import Settings
 from doxa.core.controller import ConfigureRun, Controller
@@ -17,7 +18,79 @@ from doxa.core.retrieval_commands import RetrievalQuery
 from doxa.core.retrieval_commands import query as retrieval_query
 from doxa.storage.budget import BudgetStore
 
-app = typer.Typer(no_args_is_help=True)
+app = typer.Typer(no_args_is_help=True, pretty_exceptions_show_locals=False)
+
+
+def read_contract[Model: BaseModel](model: type[Model], path: Path) -> Model:
+    from doxa.core.secrets import reject_secrets
+
+    try:
+        raw = path.read_text(encoding="utf-8-sig")
+        reject_secrets(raw)
+        return model.model_validate_json(raw)
+    except (ValueError, OSError):
+        raise typer.BadParameter(
+            "Configuration file is unreadable, secret-bearing or invalid"
+        ) from None
+
+
+@app.command("doctor")
+def doctor(data_dir: Path = Path(".doxa")) -> None:
+    from doxa.core.readiness import inspect_readiness
+
+    typer.echo(inspect_readiness(controller(data_dir)).model_dump_json(indent=2))
+
+
+@app.command("validate-config")
+def validate_config(config: Path | None = None, data_dir: Path = Path(".doxa")) -> None:
+    instance = controller(data_dir)
+    report = instance.validate_configuration(
+        read_contract(CouncilConfig, config) if config else None
+    )
+    typer.echo(report.model_dump_json(indent=2))
+    if not report.valid:
+        raise typer.Exit(1)
+
+
+@app.command("providers")
+def providers(data_dir: Path = Path(".doxa")) -> None:
+    instance = controller(data_dir)
+    typer.echo(
+        json.dumps(
+            {
+                "adapters": [p.model_dump(mode="json") for p in instance.provider_catalog()],
+                "profiles": [
+                    p.model_dump(mode="json") for p in instance.validate_configuration().profiles
+                ],
+            },
+            indent=2,
+        )
+    )
+
+
+@app.command("agents")
+def agents(data_dir: Path = Path(".doxa")) -> None:
+    typer.echo(
+        json.dumps(
+            [a.model_dump(mode="json") for a in controller(data_dir).configuration().agents],
+            indent=2,
+        )
+    )
+
+
+@app.command("profiles")
+def profiles(data_dir: Path = Path(".doxa")) -> None:
+    typer.echo(
+        json.dumps(
+            [p.model_dump(mode="json") for p in controller(data_dir).configuration().profiles],
+            indent=2,
+        )
+    )
+
+
+@app.command("recover")
+def recover(run_id: UUID, data_dir: Path = Path(".doxa")) -> None:
+    typer.echo(controller(data_dir).recover_run(run_id).model_dump_json(indent=2))
 
 
 @app.command("research-demo")
@@ -43,8 +116,15 @@ def compare_branches_command(
 def research_command(
     run_id: UUID, branch_id: UUID, config: Path, data_dir: Path = Path(".doxa")
 ) -> None:
-    adapter: TypeAdapter[Command] = TypeAdapter(Command)  # type: ignore[arg-type]
-    command = adapter.validate_json(config.read_text(encoding="utf-8"))
+    adapter: TypeAdapter[Command] = TypeAdapter(cast(Any, Command))
+    from doxa.core.secrets import reject_secrets
+
+    try:
+        raw = config.read_text(encoding="utf-8-sig")
+        reject_secrets(raw)
+        command = adapter.validate_json(raw)
+    except (ValueError, OSError):
+        raise typer.BadParameter("Research command file is invalid or secret-bearing") from None
     typer.echo(controller(data_dir).research_command(run_id, branch_id, command).model_dump_json())
 
 
@@ -100,9 +180,13 @@ def profile_from_env(version: int = 1, data_dir: Path = Path(".doxa")) -> None:
 
 @app.command("config-import")
 def config_import(config: Path, data_dir: Path = Path(".doxa")) -> None:
-    controller(data_dir).save_configuration(
-        CouncilConfig.model_validate_json(config.read_text(encoding="utf-8"))
-    )
+    instance = controller(data_dir)
+    command = read_contract(CouncilConfig, config)
+    report = instance.validate_configuration(command)
+    if not report.valid:
+        typer.echo(report.model_dump_json(indent=2))
+        raise typer.Exit(1)
+    instance.save_configuration(command)
     typer.echo("Saved immutable agent/model configuration versions (no credential values).")
 
 
@@ -113,7 +197,7 @@ def config_list(data_dir: Path = Path(".doxa")) -> None:
 
 @app.command("run-task")
 def run_task(run_id: UUID, config: Path, data_dir: Path = Path(".doxa")) -> None:
-    command = ExecuteTask.model_validate_json(config.read_text(encoding="utf-8"))
+    command = read_contract(ExecuteTask, config)
     typer.echo(
         asyncio.run(controller(data_dir).execute_task(run_id, command)).model_dump_json(indent=2)
     )
@@ -126,7 +210,7 @@ def cancel(run_id: UUID, data_dir: Path = Path(".doxa")) -> None:
 
 @app.command("memory-propose")
 def memory_propose(run_id: UUID, config: Path, data_dir: Path = Path(".doxa")) -> None:
-    command = ProposeMemory.model_validate_json(config.read_text(encoding="utf-8"))
+    command = read_contract(ProposeMemory, config)
     typer.echo(controller(data_dir).propose_memory(run_id, command).model_dump_json(indent=2))
 
 
@@ -139,7 +223,7 @@ def memory_validate(run_id: UUID, memory_id: UUID, data_dir: Path = Path(".doxa"
 def memory_transition(
     run_id: UUID, memory_id: UUID, config: Path, data_dir: Path = Path(".doxa")
 ) -> None:
-    command = TransitionMemory.model_validate_json(config.read_text(encoding="utf-8"))
+    command = read_contract(TransitionMemory, config)
     typer.echo(
         controller(data_dir).transition_memory(run_id, memory_id, command).model_dump_json(indent=2)
     )
@@ -147,7 +231,7 @@ def memory_transition(
 
 @app.command("memory-query")
 def memory_query(run_id: UUID, config: Path, data_dir: Path = Path(".doxa")) -> None:
-    command = RetrievalQuery.model_validate_json(config.read_text(encoding="utf-8"))
+    command = read_contract(RetrievalQuery, config)
     results = asyncio.run(retrieval_query(controller(data_dir), run_id, command))
     typer.echo(json.dumps([r.model_dump(mode="json") for r in results], indent=2))
 
@@ -161,9 +245,7 @@ def accounting(data_dir: Path = Path(".doxa")) -> None:
 
 @app.command()
 def reconcile(operation_id: UUID, billed_usd: str, data_dir: Path = Path(".doxa")) -> None:
-    BudgetStore(controller(data_dir).settings.database_path).reconcile(
-        operation_id, Decimal(billed_usd)
-    )
+    controller(data_dir).reconcile_charge(operation_id, Decimal(billed_usd))
     typer.echo("Operator-reported charge recorded; no external balance was inferred.")
 
 
@@ -179,7 +261,7 @@ def init(data_dir: Path = Path(".doxa")) -> None:
 
 @app.command()
 def configure(config: Path, data_dir: Path = Path(".doxa")) -> None:
-    command = ConfigureRun.model_validate_json(config.read_text(encoding="utf-8"))
+    command = read_contract(ConfigureRun, config)
     typer.echo(controller(data_dir).configure_run(command).model_dump_json(indent=2))
 
 
@@ -209,4 +291,11 @@ def serve(data_dir: Path = Path(".doxa"), port: int = 8000) -> None:
     from doxa.api.app import create_app
 
     settings = Settings(data_dir=data_dir, api_port=port)
+    instance = Controller(settings)
+    instance.initialize()
+    if not instance.validate_configuration().valid:
+        typer.echo(
+            "Some provider profiles need attention; use validate-config. "
+            "Inspection remains available."
+        )
     uvicorn.run(create_app(settings), host=settings.api_host, port=settings.api_port)

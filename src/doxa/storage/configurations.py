@@ -23,7 +23,8 @@ class ConfigurationStore:
                         key,
                     ).fetchone()
                     if row:
-                        if row[0] != body:
+                        model = ModelProfile if kind == "profile" else AgentDefinition
+                        if model.model_validate_json(row[0]) != record:
                             raise ValueError(
                                 "Configuration version is immutable; increment version"
                             )
@@ -38,6 +39,20 @@ class ConfigurationStore:
                     ).fetchone()
                     if not row:
                         raise ValueError("Agent refers to an unknown model profile version")
+                    # Resolve the pinned version, not the latest profile with this ID.
+                    profile_row = db.execute(
+                        "SELECT body FROM configurations WHERE kind='profile' "
+                        "AND id=? AND version=?",
+                        (agent.model_profile_id, agent.model_profile_version),
+                    ).fetchone()
+                    profile = ModelProfile.model_validate_json(profile_row[0])
+                    if (
+                        agent.agent.permissions.allowed_tools
+                        and profile.capabilities.tool_calling in {"unknown", "unavailable"}
+                    ):
+                        raise ValueError(
+                            "Agent tool permissions require a declared compatible profile"
+                        )
 
     def get(
         self, kind: Literal["profile", "agent"], identity: str, version: int | None = None

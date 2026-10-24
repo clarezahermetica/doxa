@@ -195,7 +195,7 @@ def test_runtime_runpod_is_guarded_and_retries_are_reserved(controller, monkeypa
     def handler(req):
         calls.append(req)
         if len(calls) == 1:
-            return httpx.Response(503, text="synthetic transient failure")
+            raise httpx.ConnectError("synthetic pre-send connection failure", request=req)
         return httpx.Response(
             200,
             json={

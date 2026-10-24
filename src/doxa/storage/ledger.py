@@ -1,5 +1,6 @@
 import sqlite3
 from pathlib import Path
+from typing import Any, cast
 from uuid import UUID
 
 from pydantic import TypeAdapter
@@ -26,9 +27,9 @@ from doxa.core.models import (
 from doxa.core.secrets import reject_secrets
 from doxa.storage.database import connection
 
-# Pydantic accepts Annotated union aliases at runtime; its constructor typing
-# currently narrows the argument to concrete classes instead of a type expression.
-record_adapter: TypeAdapter[Record] = TypeAdapter(Record)  # type: ignore[arg-type]
+# Pydantic versions differ in typing the constructor's runtime Annotated alias.
+# Bridge only that dynamic input; retain precise typed validation output.
+record_adapter: TypeAdapter[Record] = TypeAdapter(cast(Any, Record))
 
 
 class LedgerConflict(ValueError):
@@ -57,6 +58,8 @@ class Ledger:
             return tuple(self._append(event, db) for event in events)
 
     def _append(self, event: Event, db: sqlite3.Connection) -> Event:
+        # Also protect callers composing ledger writes into a financial transaction.
+        reject_secrets(event.model_dump_json())
         existing = db.execute(
             "SELECT body FROM events WHERE idempotency_key=?", (event.idempotency_key,)
         ).fetchone()

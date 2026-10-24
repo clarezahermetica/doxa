@@ -41,3 +41,20 @@ accessible specifications and the visible requirements; unseen requirements rema
   restores. Replay is read-only; fresh continuations inherit only the pinned prefix.
 - Rubric and deterministic metrics remain distinct; unknown costs stay null.
 - README remains empty; research audit, reproduction and limitations live in docs.
+
+## Backend infrastructure hardening - October 24
+
+- Keep all six research-system algorithms and Moss governance/adapter code unchanged.
+- Register only tested nonstreaming chat adapters: RunPod and explicitly configured
+  HTTPS OpenAI-compatible. Unsupported capability declarations fail before sending.
+- Readiness is local inspection; it never probes an endpoint, verifies a credential,
+  checks credits or starts compute. No current profile/endpoint/model is invented.
+- Retry only demonstrably pre-send connection failures. Post-send ambiguity retains
+  reservations and blocks service dispatch until explicit operator reconciliation.
+- Commit provider outcomes/known settlements and ledger response records atomically;
+  recover interrupted states explicitly on terminal runs without resending work.
+- Reuse existing JSON-backed configuration tables, normalize historical defaults for
+  idempotent imports, and preserve earlier serialized rows. No SQL migration needed.
+- Keep DisabledSandbox selected because WSL/container runtimes are unavailable. The
+  concrete finite TaskEnvironment does not provide generated-code isolation.
+- Keep README empty. Windows setup and full manual RunPod prerequisites live in docs.

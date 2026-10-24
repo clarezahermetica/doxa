@@ -387,6 +387,9 @@ class ModelCall(ScopedRecord):
     usage: Usage = Field(default_factory=Usage)
     error_category: str | None = None
     status: Literal["completed", "failed", "uncertain"]
+    request_hash: str | None = None
+    request_settings: dict[str, JsonValue] = Field(default_factory=dict)
+    billing_uncertain: bool | None = None
 
 
 class RetrievalAudit(ScopedRecord):

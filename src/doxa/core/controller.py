@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import TYPE_CHECKING, Literal
 from uuid import NAMESPACE_URL, UUID, uuid5
 
@@ -27,6 +28,8 @@ if TYPE_CHECKING:
     from doxa.core.memory_commands import ProposeMemory, TransitionMemory
     from doxa.core.models import Memory, Verification
     from doxa.core.research_commands import Command
+    from doxa.environments.cache_adapter import CacheTaskAdapter
+    from doxa.providers.registry import ConfigurationReport, ProviderDescriptor
     from doxa.retrieval.backends import RetrievalBackend
 
 
@@ -52,8 +55,11 @@ class Controller:
     """Single application boundary used by both clients. No inference side effects."""
 
     def __init__(self, settings: Settings):
+        from doxa.providers.registry import ProviderRegistry
+
         self.settings = settings
         self.ledger = Ledger(settings.database_path)
+        self.providers = ProviderRegistry()
 
     def initialize(self) -> None:
         migrate(self.settings.database_path)
@@ -68,6 +74,57 @@ class Controller:
 
     def configuration(self) -> CouncilConfig:
         return ConfigurationStore(self.settings.database_path).list()
+
+    def provider_catalog(self) -> tuple["ProviderDescriptor", ...]:
+        return self.providers.descriptors()
+
+    def environment_session(self, run_id: UUID, branch_id: UUID) -> "CacheTaskAdapter":
+        from doxa.environments.cache_adapter import CacheTaskAdapter
+        from doxa.environments.cache_policy import Candidate
+        from doxa.storage.artifacts import ArtifactStore
+
+        bundle = self.inspect(run_id)
+        experiment = self.ledger.get(bundle.run.experiment_id)
+        branch = self.ledger.get(branch_id)
+        if not isinstance(experiment, Experiment) or (
+            experiment.task_id,
+            experiment.task_version,
+            experiment.environment_version,
+        ) != ("cache-policy", "1", "1"):
+            raise CapabilityUnavailable("Only the finite cache-policy environment is registered")
+        if not isinstance(branch, Trajectory) or branch.run_id != run_id:
+            raise ValueError("Environment branch must belong to this run")
+        cursor = next(e.id for e in reversed(bundle.events) if e.trajectory_id == branch_id)
+        # Finite fixture baseline; subsequent policies must be typed allowed actions.
+        return CacheTaskAdapter(
+            ArtifactStore(self.settings.data_dir / "artifacts"),
+            experiment.id,
+            run_id,
+            cursor,
+            Candidate(policy="stale_on_update"),
+        )
+
+    def validate_configuration(self, config: CouncilConfig | None = None) -> "ConfigurationReport":
+        from doxa.core.secrets import local_env
+        from doxa.providers.registry import validate_configuration
+
+        config = config if config is not None else self.configuration()
+        profiles = {(p.id, p.version): p for p in config.profiles}
+        store = ConfigurationStore(self.settings.database_path)
+        for agent in config.agents:
+            key = (agent.model_profile_id, agent.model_profile_version)
+            if agent.model_profile_id and key not in profiles:
+                try:
+                    pinned = store.get(
+                        "profile", agent.model_profile_id, agent.model_profile_version
+                    )
+                except KeyError:
+                    continue
+                assert isinstance(pinned, ModelProfile)
+                profiles[(pinned.id, pinned.version)] = pinned
+        return validate_configuration(
+            config.model_copy(update={"profiles": tuple(profiles.values())}), local_env()
+        )
 
     def configure_run(self, command: ConfigureRun) -> Run:
         if command.agent_ids:
@@ -89,6 +146,7 @@ class Controller:
                         model_id=profile.model_id,
                         settings={"temperature": profile.temperature},
                         instruction_version=definition.instruction_version,
+                        pricing_version=profile.pricing.version if profile.pricing else None,
                     )
                 agents.append(
                     definition.agent.model_copy(
@@ -132,6 +190,57 @@ class Controller:
 
     def list_runs(self) -> list[Run]:
         return [self.inspect(r.id).run for r in self.ledger.records("run") if isinstance(r, Run)]
+
+    def recover_run(self, run_id: UUID) -> RunBundle:
+        from doxa.storage.budget import BudgetStore
+
+        self.inspect(run_id)
+        BudgetStore(self.settings.database_path).recover_interrupted(run_id, self.ledger)
+        return self.inspect(run_id)
+
+    def reconcile_charge(self, operation_id: UUID, billed_usd: Decimal) -> None:
+        from doxa.core.models import Evidence, Provenance
+        from doxa.storage.budget import BudgetStore
+
+        budgets = BudgetStore(self.settings.database_path)
+        operation = next((o for o in budgets.operations() if o["id"] == str(operation_id)), None)
+        if operation is None:
+            raise ValueError("Unknown provider operation")
+        run_id = UUID(str(operation["run_id"]))
+        bundle = self.inspect(run_id)
+        previous = bundle.events[-1]
+        prior = next(
+            (e for e in bundle.events if e.idempotency_key == f"billing:{operation_id}"), None
+        )
+        evidence = Evidence(
+            id=uuid5(operation_id, "bill-evidence"),
+            experiment_id=previous.experiment_id,
+            run_id=run_id,
+            trajectory_id=previous.trajectory_id,
+            provenance=Provenance.HUMAN_ANNOTATION,
+            source="operator-reported-billing",
+            description=f"Operation {operation_id}; operator-reported USD "
+            f"{billed_usd.quantize(Decimal('0.000001')):f}",
+        )
+        if prior:
+            if not isinstance(prior.payload[0], Evidence) or (
+                prior.payload[0].description != evidence.description
+            ):
+                raise ValueError("Operator billing reconciliation is immutable")
+            return
+        event = Event(
+            id=uuid5(operation_id, "bill-event"),
+            experiment_id=previous.experiment_id,
+            run_id=run_id,
+            trajectory_id=previous.trajectory_id,
+            sequence=1,
+            provenance=Provenance.HUMAN_ANNOTATION,
+            type=EventType.OBSERVATION_RECEIVED,
+            parent_event_ids=(previous.id,),
+            idempotency_key=f"billing:{operation_id}",
+            payload=(evidence,),
+        )
+        budgets.reconcile(operation_id, billed_usd, ledger=self.ledger, event=event)
 
     def inspect(self, run_id: UUID) -> RunBundle:
         run = self.ledger.get(run_id)

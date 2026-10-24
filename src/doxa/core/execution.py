@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid5
 
-from pydantic import Field
+from pydantic import Field, ValidationError
 
 from doxa.core.models import (
     Agent,
@@ -43,6 +43,11 @@ from doxa.environments.cache_policy import (
     verify,
 )
 from doxa.providers.contracts import ModelMessage, ModelRequest, ModelResponse
+from doxa.providers.registry import (
+    provider_environment,
+    reservation_upper_bound,
+    spending_allowance,
+)
 from doxa.providers.runpod import RunPodProvider
 from doxa.storage.artifacts import ArtifactStore
 from doxa.storage.budget import BudgetStore
@@ -51,6 +56,12 @@ from doxa.storage.ledger import LedgerConflict
 
 if TYPE_CHECKING:
     from doxa.core.controller import Controller, RunBundle
+
+
+class ProviderCallFailed(RuntimeError):
+    def __init__(self, category: str):
+        self.category = category
+        super().__init__("Provider " + category)
 
 
 class ExecuteTask(Contract):
@@ -93,24 +104,28 @@ class Runtime:
         records: tuple[Record, ...] = (),
         actor: Agent | None = None,
         provenance: Provenance = Provenance.SYSTEM_INFERENCE,
+        operation_id: UUID | None = None,
+        outcome: str = "completed",
+        billed_usd: Decimal | None = None,
     ) -> Event:
         previous = self.ledger.events(self.run.id)[-1]
-        return self.ledger.append(
-            Event(
-                experiment_id=self.experiment.id,
-                run_id=self.run.id,
-                trajectory_id=self.branch,
-                sequence=1,
-                type=event_type,
-                payload=records,
-                idempotency_key=f"{self.run.id}:{key}",
-                parent_event_ids=(previous.id,),
-                actor_id=actor.id if actor else None,
-                actor_role=actor.role if actor else Role.ORCHESTRATOR,
-                provenance=provenance,
-                model=actor.model if actor else None,
-            )
+        event = Event(
+            experiment_id=self.experiment.id,
+            run_id=self.run.id,
+            trajectory_id=self.branch,
+            sequence=1,
+            type=event_type,
+            payload=records,
+            idempotency_key=f"{self.run.id}:{key}",
+            parent_event_ids=(previous.id,),
+            actor_id=actor.id if actor else None,
+            actor_role=actor.role if actor else Role.ORCHESTRATOR,
+            provenance=provenance,
+            model=actor.model if actor else None,
         )
+        if operation_id is not None:
+            return self.calls.complete_call(operation_id, outcome, billed_usd, event, self.ledger)
+        return self.ledger.append(event)
 
     def ensure_running(self) -> None:
         if self.controller.inspect(self.run.id).run.status != "running":
@@ -156,21 +171,12 @@ class Runtime:
             "profile", agent.model_profile_id, agent.model_profile_version
         )
         assert isinstance(profile, ModelProfile)
-        if profile.provider != "runpod":
-            raise ValueError("Only RunPod adapter is registered for live runtime calls")
         env = local_env()
-        allowance = Decimal(env.get("DOXA_RUNPOD_ALLOWANCE_USD", "0"))
-        upper = self.command.upper_bound_usd_per_attempt
-        if upper is None:
-            raise ValueError("A complete per-attempt compute cost upper bound is required")
-        if not profile.enabled or env.get("DOXA_RUNPOD_ENABLED", "false").lower() != "true":
-            raise PermissionError("RunPod is disabled")
-        # Validate URL and credential presence before reserving a possible charge.
-        from doxa.providers.runpod import endpoint_url
-
-        endpoint_url(profile, env)
-        if not env.get(profile.credential_env) or env.get(profile.credential_env) == "replace_me":
-            raise ValueError("RunPod backend credential is missing")
+        switch, _ = provider_environment(profile.provider)
+        if not profile.enabled or env.get(switch, "false").lower() != "true":
+            raise PermissionError("Provider is disabled")
+        allowance = spending_allowance(profile, env)
+        provider = self.controller.providers.create(profile, env, factory=RunPodProvider)
         budget = self.experiment.budget
         for attempt in range(min(profile.retries, budget.max_retries) + 1):
             self.ensure_running()
@@ -197,21 +203,23 @@ class Runtime:
                 profile.max_context_tokens, budget.max_context_tokens
             ):
                 raise ValueError("Context/output budget exceeded")
+            provider.validate_request(request)
+            upper = reservation_upper_bound(
+                profile, request, self.command.upper_bound_usd_per_attempt
+            )
             self.calls.reserve(
                 self.run.id,
                 call_id,
                 upper,
-                service="runpod",
+                service=profile.provider,
                 service_cap_usd=allowance,
                 request_hash=hashlib.sha256(request.model_dump_json().encode()).hexdigest(),
                 max_calls=budget.max_model_calls,
             )
             self.calls.dispatch_once(call_id, profile.concurrency)
-            provider = RunPodProvider(profile, env)
             try:
                 response = await provider.generate(request)
             except BaseException:
-                self.calls.finish(call_id, "uncertain")
                 record = ModelCall.model_validate(
                     dict(
                         **self.scope(),
@@ -221,21 +229,38 @@ class Runtime:
                         assignment=agent.model,
                         status="uncertain",
                         error_category="local_cancel_or_crash",
+                        billing_uncertain=True,
+                        request_hash=hashlib.sha256(request.model_dump_json().encode()).hexdigest(),
                     )
                 )
-                self.emit(f"{phase}:uncertain:{attempt}", EventType.MODEL_CALL_RECORDED, (record,))
+                self.emit(
+                    f"{phase}:uncertain:{attempt}",
+                    EventType.MODEL_CALL_RECORDED,
+                    (record,),
+                    operation_id=call_id,
+                    outcome="uncertain",
+                )
                 raise
-            self.calls.finish(call_id, "completed" if response.error is None else "failed")
-            self.record_response(response, agent, phase, attempt, upper)
+            self.record_response(response, agent, phase, attempt, upper, request)
             self.ensure_running()
             if response.error is None:
                 return Candidate.model_validate_json(response.text or "")
-            if not response.error.retryable or attempt >= min(profile.retries, budget.max_retries):
-                raise RuntimeError("Provider " + response.error.category)
+            if (
+                response.error.billing_uncertain
+                or not response.error.retryable
+                or attempt >= min(profile.retries, budget.max_retries)
+            ):
+                raise ProviderCallFailed(response.error.category)
         raise RuntimeError("Provider attempts exhausted")
 
     def record_response(
-        self, response: ModelResponse, agent: Agent, phase: str, attempt: int, upper: Decimal
+        self,
+        response: ModelResponse,
+        agent: Agent,
+        phase: str,
+        attempt: int,
+        upper: Decimal,
+        request: ModelRequest,
     ) -> None:
         assert agent.model is not None
         record = ModelCall.model_validate(
@@ -249,9 +274,22 @@ class Runtime:
                 reported_model_id=safe_text(response.reported_model_id)
                 if response.reported_model_id
                 else None,
-                usage=response.usage.model_copy(update={"estimated_usd": upper}),
+                usage=response.usage.model_copy(
+                    update={
+                        "estimated_usd": upper,
+                        "pricing_version": agent.model.pricing_version,
+                    }
+                ),
                 error_category=response.error.category if response.error else None,
-                status="failed" if response.error else "completed",
+                status=("uncertain" if response.error.billing_uncertain else "failed")
+                if response.error
+                else "completed",
+                billing_uncertain=response.error.billing_uncertain if response.error else None,
+                request_hash=hashlib.sha256(request.model_dump_json().encode()).hexdigest(),
+                request_settings={
+                    "max_output_tokens": request.max_output_tokens,
+                    "timeout_seconds": request.timeout_seconds,
+                },
             )
         )
         records: tuple[Record, ...] = (record,)
@@ -274,6 +312,11 @@ class Runtime:
             records,
             agent,
             Provenance.MODEL_OUTPUT,
+            operation_id=response.call_id,
+            outcome="completed"
+            if response.error is None
+            else ("uncertain" if response.error.billing_uncertain else "failed"),
+            billed_usd=response.usage.billed_usd,
         )
 
     def check(self, candidate: Candidate, key: str) -> tuple[Claim, Verification, bool]:
@@ -638,7 +681,17 @@ class Runtime:
                         **self.scope(),
                         id=self.identity("stopped"),
                         status="cancelled" if cancelled else "failed",
-                        reason_code="local_cancellation" if cancelled else type(exc).__name__,
+                        reason_code="local_cancellation"
+                        if cancelled
+                        else (
+                            "provider:" + exc.category
+                            if isinstance(exc, ProviderCallFailed)
+                            else "model_output_invalid"
+                            if isinstance(exc, ValidationError)
+                            else "configuration:" + type(exc).__name__
+                            if isinstance(exc, (ValueError, PermissionError))
+                            else "application:" + type(exc).__name__
+                        ),
                     )
                 )
                 self.emit(

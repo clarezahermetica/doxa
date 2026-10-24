@@ -1,10 +1,10 @@
 from decimal import Decimal
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid5
 
-from doxa.core.models import Experiment, Run
+from doxa.core.models import Event, EventType, Evidence, Experiment, Provenance, Run, RunState
 from doxa.storage.database import connection
-from doxa.storage.ledger import record_adapter
+from doxa.storage.ledger import Ledger, record_adapter
 
 
 class BudgetExceeded(ValueError):
@@ -121,6 +121,11 @@ class BudgetStore:
             ).fetchone()
             if row is None or row[1] != "prepared":
                 raise BudgetExceeded("Operation already dispatched or requires reconciliation")
+            uncertain = db.execute(
+                "SELECT COUNT(*) FROM operations WHERE service=? AND state='uncertain'", (row[0],)
+            ).fetchone()[0]
+            if uncertain:
+                raise BudgetExceeded("Service concurrency/uncertain-operation guard reached")
             active = db.execute(
                 """SELECT COUNT(*) FROM operations WHERE service=?
                 AND state IN ('in_flight','uncertain')""",
@@ -139,6 +144,40 @@ class BudgetStore:
                 (state, str(operation_id)),
             )
 
+    def complete_call(
+        self,
+        operation_id: UUID,
+        state: str,
+        billed_usd: Decimal | None,
+        event: Event,
+        ledger: Ledger,
+    ) -> Event:
+        """Persist observed response/error and durable operation state atomically."""
+        if state not in {"completed", "failed", "uncertain"}:
+            raise ValueError("Invalid operation outcome")
+        amount = microusd(billed_usd) if billed_usd is not None else None
+        with connection(self.path) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            operation = db.execute(
+                "SELECT state FROM operations WHERE id=?", (str(operation_id),)
+            ).fetchone()
+            if operation is None:
+                raise ValueError("Unknown provider operation")
+            if operation[0] not in {"in_flight", state}:
+                raise ValueError("Provider operation cannot transition from its durable state")
+            if amount is not None:
+                prior = db.execute(
+                    "SELECT billed_microusd FROM reservations WHERE id=?", (str(operation_id),)
+                ).fetchone()[0]
+                if prior is not None and prior != amount:
+                    raise ValueError("Settled charge is immutable")
+                db.execute(
+                    "UPDATE reservations SET billed_microusd=?,status='settled' WHERE id=?",
+                    (amount, str(operation_id)),
+                )
+            db.execute("UPDATE operations SET state=? WHERE id=?", (state, str(operation_id)))
+            return ledger._append(event, db)
+
     def operations(self) -> list[dict[str, str | int | None]]:
         with connection(self.path) as db:
             rows = db.execute("""SELECT o.id,r.run_id,o.service,o.state,
@@ -147,11 +186,84 @@ class BudgetStore:
         names = ("id", "run_id", "service", "state", "reserved_microusd", "billed_microusd")
         return [dict(zip(names, row, strict=True)) for row in rows]
 
-    def reconcile(self, operation_id: UUID, billed_usd: Decimal) -> None:
+    def reconcile(
+        self,
+        operation_id: UUID,
+        billed_usd: Decimal,
+        *,
+        ledger: Ledger | None = None,
+        event: Event | None = None,
+    ) -> None:
         # Operator-supplied vendor reconciliation; never infer a zero bill from an error.
-        self.settle(operation_id, billed_usd)
+        amount = microusd(billed_usd)
         with connection(self.path) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT billed_microusd FROM reservations WHERE id=?", (str(operation_id),)
+            ).fetchone()
+            if row is None:
+                raise ValueError("Unknown reservation")
+            if row[0] is not None and row[0] != amount:
+                raise ValueError("Settled charge is immutable")
+            db.execute(
+                "UPDATE reservations SET billed_microusd=?,status='settled' WHERE id=?",
+                (amount, str(operation_id)),
+            )
             db.execute("UPDATE operations SET state='completed' WHERE id=?", (str(operation_id),))
+            if ledger is not None and event is not None:
+                ledger._append(event, db)
+
+    def recover_interrupted(self, run_id: UUID, ledger: Ledger) -> None:
+        """Operator recovery after cancellation/failure, never a remote cancellation claim."""
+        with connection(self.path) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            states = db.execute(
+                "SELECT body FROM records WHERE run_id=? AND kind='run_state' "
+                "ORDER BY rowid DESC LIMIT 1",
+                (str(run_id),),
+            ).fetchone()
+            if states is None or RunState.model_validate_json(states[0]).status not in {
+                "cancelled",
+                "failed",
+                "completed",
+            }:
+                raise ValueError("Cancel the interrupted run before recovering its call states")
+            operations = db.execute(
+                "SELECT o.id,o.state FROM operations o JOIN reservations r ON o.id=r.id "
+                "WHERE r.run_id=? AND o.state IN ('prepared','in_flight')",
+                (str(run_id),),
+            ).fetchall()
+            previous_row = db.execute(
+                "SELECT body FROM events WHERE run_id=? ORDER BY rowid DESC LIMIT 1", (str(run_id),)
+            ).fetchone()
+            previous = Event.model_validate_json(previous_row[0])
+            for identity, state in operations:
+                outcome = "uncertain" if state == "in_flight" else "failed"
+                evidence = Evidence(
+                    id=uuid5(UUID(identity), "recovery"),
+                    experiment_id=previous.experiment_id,
+                    run_id=run_id,
+                    trajectory_id=previous.trajectory_id,
+                    provenance=Provenance.TOOL_OBSERVATION,
+                    source="durable-operation-recovery-v1",
+                    description=f"Operation {identity}: {state} -> {outcome}; "
+                    "reservation retained; "
+                    "remote billing/cancellation unverified",
+                )
+                event = Event(
+                    id=uuid5(UUID(identity), "recovery-event"),
+                    experiment_id=previous.experiment_id,
+                    run_id=run_id,
+                    trajectory_id=previous.trajectory_id,
+                    sequence=1,
+                    type=EventType.PROVIDER_FAILED,
+                    provenance=Provenance.TOOL_OBSERVATION,
+                    parent_event_ids=(previous.id,),
+                    idempotency_key=f"operation-recovery:{identity}",
+                    payload=(evidence,),
+                )
+                db.execute("UPDATE operations SET state=? WHERE id=?", (outcome, identity))
+                previous = ledger._append(event, db)
 
     def settle(self, operation_id: UUID, billed_usd: Decimal | None) -> None:
         if billed_usd is None:

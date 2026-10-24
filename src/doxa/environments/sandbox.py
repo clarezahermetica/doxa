@@ -1,3 +1,4 @@
+import shutil
 from typing import Protocol
 
 from pydantic import Field
@@ -13,6 +14,26 @@ class SandboxLimits(Contract):
     timeout_seconds: int = Field(default=30, gt=0)
     writable_mb: int = Field(default=64, gt=0)
     read_only_root: bool = True
+    max_processes: int = Field(default=32, ge=1, le=256)
+
+
+class SandboxStatus(Contract):
+    execution_enabled: bool = False
+    runtime_detected: bool
+    prerequisite: str
+
+
+def sandbox_status() -> SandboxStatus:
+    detected = bool(shutil.which("docker") or shutil.which("podman"))
+    return SandboxStatus(
+        runtime_detected=detected,
+        prerequisite=(
+            "An enforced and acceptance-tested container runner is not implemented"
+            if detected
+            else "Install/start Docker Desktop with Linux containers (WSL2), "
+            "or an equivalent restricted runtime, then validate the container runner"
+        ),
+    )
 
 
 class Sandbox(Protocol):

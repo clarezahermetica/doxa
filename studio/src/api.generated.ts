@@ -39,6 +39,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Readiness */
+        get: operations["readiness_api_readiness_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Providers */
+        get: operations["providers_api_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/configuration/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Configuration */
+        post: operations["validate_configuration_api_configuration_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs": {
         parameters: {
             query?: never;
@@ -170,6 +221,23 @@ export interface paths {
         put?: never;
         /** Cancel */
         post: operations["cancel_api_runs__run_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recover */
+        post: operations["recover_api_runs__run_id__recover_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1345,6 +1413,21 @@ export interface components {
              */
             caveat: string;
         };
+        /** ConfigurationReport */
+        ConfigurationReport: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Valid */
+            valid: boolean;
+            /** Issues */
+            issues: string[];
+            /** Profiles */
+            profiles: components["schemas"]["ProfileReadiness"][];
+        };
         /** ConfigureRun */
         ConfigureRun: {
             /**
@@ -1929,6 +2012,29 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** InstallationReadiness */
+        InstallationReadiness: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Mode
+             * @default local_only
+             */
+            mode: string;
+            configuration: components["schemas"]["ConfigurationReport"];
+            /** Providers */
+            providers: components["schemas"]["ProviderDescriptor"][];
+            sandbox: components["schemas"]["SandboxStatus"];
+            /**
+             * External Probe Performed
+             * @default false
+             */
+            external_probe_performed: boolean;
+        };
         JsonValue: unknown;
         /** LifecycleCommand */
         LifecycleCommand: {
@@ -2133,6 +2239,14 @@ export interface components {
              * @enum {string}
              */
             status: "completed" | "failed" | "uncertain";
+            /** Request Hash */
+            request_hash: string | null;
+            /** Request Settings */
+            request_settings: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            /** Billing Uncertain */
+            billing_uncertain: boolean | null;
         };
         /** ModelProfile */
         "ModelProfile-Input": {
@@ -2187,6 +2301,11 @@ export interface components {
              */
             max_context_tokens: number;
             /**
+             * Max Input Bytes
+             * @default 4096
+             */
+            max_input_bytes: number;
+            /**
              * Timeout Seconds
              * @default 30
              */
@@ -2201,6 +2320,7 @@ export interface components {
              * @default 1
              */
             concurrency: number;
+            pricing?: components["schemas"]["PricingMetadata-Input"] | null;
         };
         /** ModelProfile */
         "ModelProfile-Output": {
@@ -2255,6 +2375,11 @@ export interface components {
              */
             max_context_tokens: number;
             /**
+             * Max Input Bytes
+             * @default 4096
+             */
+            max_input_bytes: number;
+            /**
              * Timeout Seconds
              * @default 30
              */
@@ -2269,6 +2394,7 @@ export interface components {
              * @default 1
              */
             concurrency: number;
+            pricing: components["schemas"]["PricingMetadata-Output"] | null;
         };
         /** Permissions */
         "Permissions-Input": {
@@ -2317,6 +2443,95 @@ export interface components {
              * @default false
              */
             share_memory: boolean;
+        };
+        /** PricingMetadata */
+        "PricingMetadata-Input": {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Version */
+            version: string;
+            /** Source */
+            source: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "token" | "complete_operation";
+            /** Input Usd Per Million */
+            input_usd_per_million?: number | string | null;
+            /** Output Usd Per Million */
+            output_usd_per_million?: number | string | null;
+            /** Complete Operation Upper Bound Usd */
+            complete_operation_upper_bound_usd?: number | string | null;
+        };
+        /** PricingMetadata */
+        "PricingMetadata-Output": {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Version */
+            version: string;
+            /** Source */
+            source: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "token" | "complete_operation";
+            /** Input Usd Per Million */
+            input_usd_per_million: string | null;
+            /** Output Usd Per Million */
+            output_usd_per_million: string | null;
+            /** Complete Operation Upper Bound Usd */
+            complete_operation_upper_bound_usd: string | null;
+        };
+        /** ProfileReadiness */
+        ProfileReadiness: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Profile Id */
+            profile_id: string;
+            /** Version */
+            version: number;
+            /** Provider */
+            provider: string;
+            /** Model Id */
+            model_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "disabled" | "not_ready" | "ready_for_authorized_test";
+            /** Issues */
+            issues: string[];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+            /** Credential Env */
+            credential_env: string;
+            /** Credential Present */
+            credential_present: boolean;
+            /**
+             * Remote Verified
+             * @default false
+             * @constant
+             */
+            remote_verified: false;
+            /** Credit Balance Usd */
+            credit_balance_usd: null;
         };
         /** ProposeMemory */
         ProposeMemory: {
@@ -2371,6 +2586,20 @@ export interface components {
          * @enum {string}
          */
         Provenance: "model_output" | "tool_observation" | "deterministic_verifier" | "task_answer_key" | "human_annotation" | "imported_source" | "system_inference" | "llm_evaluator";
+        /** ProviderDescriptor */
+        ProviderDescriptor: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Provider */
+            provider: string;
+            /** Implemented */
+            implemented: boolean;
+            capabilities: components["schemas"]["Capabilities-Output"];
+        };
         /** ReconcileCharge */
         ReconcileCharge: {
             /**
@@ -2721,6 +2950,24 @@ export interface components {
             /** Reason Code */
             reason_code: string;
         };
+        /** SandboxStatus */
+        SandboxStatus: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /**
+             * Execution Enabled
+             * @default false
+             */
+            execution_enabled: boolean;
+            /** Runtime Detected */
+            runtime_detected: boolean;
+            /** Prerequisite */
+            prerequisite: string;
+        };
         /** Trajectory */
         Trajectory: {
             /**
@@ -3007,6 +3254,79 @@ export interface operations {
             };
         };
     };
+    readiness_api_readiness_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallationReadiness"];
+                };
+            };
+        };
+    };
+    providers_api_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderDescriptor"][];
+                };
+            };
+        };
+    };
+    validate_configuration_api_configuration_validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CouncilConfig-Input"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigurationReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     runs_api_runs_get: {
         parameters: {
             query?: never;
@@ -3260,6 +3580,37 @@ export interface operations {
         };
     };
     cancel_api_runs__run_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunBundle"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recover_api_runs__run_id__recover_post: {
         parameters: {
             query?: never;
             header?: never;

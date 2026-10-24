@@ -5,6 +5,8 @@ import './style.css';
 
 type Run = components['schemas']['Run'];
 type RunBundle = components['schemas']['RunBundle'];
+type CouncilConfig = components['schemas']['CouncilConfig-Output'];
+type InstallationReadiness = components['schemas']['InstallationReadiness'];
 
 async function read<T>(url: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal });
@@ -20,6 +22,24 @@ function Studio() {
   const [detailError, setDetailError] = useState('');
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
+  const [configuration, setConfiguration] = useState<CouncilConfig | null>(null);
+  const [readiness, setReadiness] = useState<InstallationReadiness | null>(null);
+  const [configurationError, setConfigurationError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setConfiguration(null);
+    setReadiness(null);
+    setConfigurationError('');
+    Promise.all([
+      read<CouncilConfig>('/api/configuration', controller.signal),
+      read<InstallationReadiness>('/api/readiness', controller.signal),
+    ]).then(([config, status]) => { setConfiguration(config); setReadiness(status); })
+      .catch((error: Error) => {
+        if (!controller.signal.aborted) setConfigurationError(error.message);
+      });
+    return () => controller.abort();
+  }, [revision]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -48,6 +68,24 @@ function Studio() {
     <header><p className="eyebrow">LOCAL RESEARCH FRAMEWORK · BACKEND PROTOTYPE</p><h1>DOXA</h1>
       <p>Experiments, trajectories, and evidence from your local ledger.</p></header>
     <aside>Bounded cache-policy prototype. Synthetic runs use supplied answers. External services are optional; generated-code execution remains disabled.</aside>
+    <section aria-labelledby="configuration-heading">
+      <h2 id="configuration-heading">Agents and provider readiness</h2>
+      <p>Local configuration checks only. Remote availability and credit balances are unverified.</p>
+      {configurationError && <p role="alert">{configurationError}</p>}
+      {readiness && <>
+        {readiness.configuration.profiles.length === 0 && <p>No model profiles configured. Offline inspection is available.</p>}
+        <ul>{readiness.configuration.profiles.map(profile => <li key={`${profile.profile_id}:${profile.version}`}>
+          <strong>{profile.profile_id} v{profile.version}</strong> · {profile.provider} · {profile.model_id} · {profile.status}
+          <p>Credential reference: {profile.credential_env}; {profile.credential_present ? 'present locally' : 'missing'}.</p>
+          {profile.issues.length > 0 && <ul>{profile.issues.map(issue => <li key={issue}>{issue}</li>)}</ul>}
+          {profile.warnings.map(warning => <p key={warning}>{warning}</p>)}
+        </li>)}</ul>
+        <p>Generated-code execution: {readiness.sandbox.execution_enabled ? 'enabled' : 'disabled'}. {readiness.sandbox.prerequisite}</p>
+      </>}
+      {configuration && <details><summary>Stored agents, permissions and model assignments ({configuration.agents.length} agents)</summary>
+        <pre>{JSON.stringify(configuration, null, 2)}</pre>
+      </details>}
+    </section>
     <section aria-labelledby="runs-heading">
       <div className="row"><h2 id="runs-heading">Configured runs</h2><button onClick={() => setRevision(r => r + 1)} disabled={loading}>Refresh ledger</button></div>
       {listError && <p role="alert">{listError}. Start the local API with <code>doxa serve</code>.</p>}
@@ -62,6 +100,10 @@ function Studio() {
       {!selected && <p>Select a configured run to inspect its records.</p>}
       {selected && !bundle && !detailError && <p role="status">Reading trajectory…</p>}
       {bundle && <><p>{bundle.events.length} recorded event(s). This run is {bundle.run.status}.</p>
+        <details><summary>Recorded provider usage and reservations</summary>
+          <p>Reservations are spending holds. An unreported bill remains null.</p>
+          <pre>{JSON.stringify(bundle.accounting, null, 2)}</pre>
+        </details>
         <a href={`/api/runs/${encodeURIComponent(selected)}/export`} download={`${selected}.json`}>Export ledger JSON</a>
         {bundle.events.map(event => <article key={event.id}>
           <h3>{event.sequence}. {event.type}</h3><p>{event.provenance} · <time>{event.timestamp}</time></p>

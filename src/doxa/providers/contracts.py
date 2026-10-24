@@ -7,7 +7,7 @@ from doxa.core.models import Contract, ModelAssignment, Usage
 
 
 class ProviderConfig(Contract):
-    provider: Literal["openai", "gemini", "openai_compatible", "claude"]
+    provider: Literal["runpod", "openai", "gemini", "openai_compatible", "claude"]
     model_id: str
     base_url: str | None = None
     credential_env: str | None = None  # Name only; credentials never enter contracts.
@@ -43,9 +43,19 @@ class ModelRequest(Contract):
 
 
 class ProviderError(Contract):
-    category: Literal["authentication", "quota", "timeout", "transport", "invalid_response"]
+    category: Literal[
+        "authentication",
+        "quota",
+        "timeout",
+        "transport",
+        "invalid_response",
+        "configuration",
+        "unsupported",
+        "invalid_request",
+    ]
     retryable: bool
     safe_message: str  # Sanitized category text, not a raw provider response or headers.
+    billing_uncertain: bool = True
 
 
 class ModelResponse(Contract):
@@ -66,6 +76,7 @@ class ModelResponse(Contract):
 
 
 class ModelProvider(Protocol):
+    def validate_request(self, request: ModelRequest) -> None: ...
     def capabilities(self, config: ProviderConfig) -> Capabilities: ...
     async def generate(self, request: ModelRequest) -> ModelResponse: ...
     async def cancel(self, call_id: UUID) -> bool: ...

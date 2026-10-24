@@ -1,3 +1,8 @@
+Infrastructure addendum: [windows-setup.md](windows-setup.md) documents provider
+registry/readiness, safe response parsing, atomic operation+event commits, explicit
+recovery/reconciliation, the finite TaskEnvironment implementation and inspection UI.
+It supersedes historical infrastructure deferrals below. Research mechanisms are unchanged.
+
 Research stage addendum: [research-systems.md](research-systems.md) documents the
 controller command dispatcher, pure branch/rule projections, atomic multi-event
 writes, manifested restores and annotations now implemented. Its precise scope

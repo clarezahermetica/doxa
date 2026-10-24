@@ -1,4 +1,21 @@
-# Current research stage — October 24, 2026
+# Backend infrastructure hardening - October 24, 2026
+
+The optional provider registry, local readiness/configuration reports, guarded RunPod
+and explicit HTTPS compatible inference adapters, atomic provider outcome/accounting,
+operator recovery/reconciliation, concrete finite TaskEnvironment port, CLI commands
+and Studio readiness/assignment views are implemented. See [Windows setup and RunPod
+handoff](windows-setup.md) and [verification](verification/backend-completion.md).
+
+Live inference remains untested and disabled in this installation. No endpoint, model
+or credential was invented, and no paid request or deployment occurred. The current
+ledger has three offline agents and no configured model profiles. WSL is not installed;
+Docker/Podman are unavailable. Generated source execution therefore remains disabled.
+The six-system algorithms, Memory Tribunal rules and Moss adapters were preserved.
+
+The earlier stage descriptions below are historical, superseded where the current
+infrastructure handoff or research-system handoff documents tested functionality.
+
+# Current research stage â€” October 24, 2026
 
 Controller-owned research commands now implement the six-system domain mechanisms
 on the finite cache-policy fixture. See [the implementation handoff](research-systems.md)
