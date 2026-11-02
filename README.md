@@ -1,5 +1,3 @@
-# DOXA
-
 this was supposed to be my submission for cal hacks. the only problem is that i didn't finish it. what was supposed to take 3 days has turned into well over a week of development, with no end in sight
 
 anyway, i'm leaving this repository public as a proof of concept. it is extremely unfinished, broken in ways i haven't discovered yet, and generally a work in progress. make of that what you will
