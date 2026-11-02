@@ -11,7 +11,11 @@ class ConfigurationStore:
         self.path = path
 
     def save(self, config: CouncilConfig) -> None:
-        reject_secrets(config.model_dump_json())
+        reject_secrets(
+            config.model_dump_json(),
+            directory=self.path.parent,
+            credential_names=tuple(profile.credential_env for profile in config.profiles),
+        )
         with connection(self.path) as db, db:
             db.execute("BEGIN IMMEDIATE")
             for kind, records in (("profile", config.profiles), ("agent", config.agents)):
@@ -46,10 +50,10 @@ class ConfigurationStore:
                         (agent.model_profile_id, agent.model_profile_version),
                     ).fetchone()
                     profile = ModelProfile.model_validate_json(profile_row[0])
-                    if (
-                        agent.agent.permissions.allowed_tools
-                        and profile.capabilities.tool_calling in {"unknown", "unavailable"}
-                    ):
+                    if any(
+                        tool not in {"web_search", "web_fetch"}
+                        for tool in agent.agent.permissions.allowed_tools
+                    ) and profile.capabilities.tool_calling in {"unknown", "unavailable"}:
                         raise ValueError(
                             "Agent tool permissions require a declared compatible profile"
                         )

@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import time
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid5
 
 from pydantic import Field, ValidationError
@@ -34,7 +34,7 @@ from doxa.core.models import (
     Verification,
 )
 from doxa.core.profiles import ModelProfile
-from doxa.core.secrets import local_env, safe_text
+from doxa.core.secrets import reject_secrets, safe_text, workspace_env
 from doxa.environments.cache_policy import (
     CacheEnvironment,
     CacheFixture,
@@ -69,6 +69,7 @@ class ExecuteTask(Contract):
     synthetic_answers: dict[str, Candidate] = Field(default_factory=dict)
     authorize_paid: bool = False
     upper_bound_usd_per_attempt: Decimal | None = Field(default=None, gt=0, le=25)
+    authorized_allowances: dict[str, Decimal] = Field(default_factory=dict)
 
 
 class Runtime:
@@ -135,6 +136,8 @@ class Runtime:
         found = next((a for a in self.experiment.agents if a.role == role and a.enabled), None)
         if found is None:
             raise ValueError(f"Enabled {role.value} agent is required")
+        if sum(a.role == role and a.enabled for a in self.experiment.agents) > 1:
+            raise ValueError("Cache protocol requires one agent per role; use a workbench Council")
         return found
 
     async def propose(self, agent: Agent, phase: str, context: str) -> Candidate:
@@ -163,38 +166,54 @@ class Runtime:
             return answer
         if self.run.execution_kind != "live" or self.command.synthetic_answers:
             raise ValueError("Replay cannot be executed as live inference")
-        if not self.command.authorize_paid or not agent.permissions.remote_inference:
-            raise PermissionError("Explicit paid-call authorization and agent permission required")
+        messages = (
+            ModelMessage(role="system", content=agent.instructions),
+            ModelMessage(
+                role="user",
+                content=context + "\nReturn only JSON: "
+                '{"policy":"invalidate_all|stale_on_update|stale_on_delete"}',
+            ),
+        )
+        return Candidate.model_validate_json(await self.model_text(agent, phase, messages))
+
+    async def model_text(self, agent: Agent, phase: str, messages: tuple[ModelMessage, ...]) -> str:
+        if not agent.permissions.remote_inference:
+            raise PermissionError("Agent inference permission required")
         if not agent.model_profile_id or not agent.model:
             raise ValueError("Live agent requires a pinned model profile")
         profile = ConfigurationStore(self.controller.settings.database_path).get(
             "profile", agent.model_profile_id, agent.model_profile_version
         )
         assert isinstance(profile, ModelProfile)
-        env = local_env()
-        switch, _ = provider_environment(profile.provider)
+        env = workspace_env(self.controller.settings.data_dir)
+        if profile.local:
+            return await self.local_model_text(agent, phase, messages, profile, env)
+        if not self.command.authorize_paid:
+            raise PermissionError("Explicit paid-call authorization required")
+        switch, _ = provider_environment(profile.runtime)
         if not profile.enabled or env.get(switch, "false").lower() != "true":
             raise PermissionError("Provider is disabled")
         allowance = spending_allowance(profile, env)
+        if self.command.authorized_allowances:
+            pinned_allowance = self.command.authorized_allowances.get(
+                f"{profile.id}@{profile.version}"
+            )
+            if pinned_allowance is None:
+                raise PermissionError("Profile is outside the launch authorization")
+            allowance = min(allowance, pinned_allowance)
         provider = self.controller.providers.create(profile, env, factory=RunPodProvider)
         budget = self.experiment.budget
         for attempt in range(min(profile.retries, budget.max_retries) + 1):
             self.ensure_running()
             call_id = self.identity(f"{phase}:call:{attempt}")
             request = ModelRequest(
+                **self.request_identity(agent, phase, profile, call_id),
                 call_id=call_id,
                 run_id=self.run.id,
                 trajectory_id=self.branch,
                 agent_id=agent.id,
                 assignment=agent.model,
-                messages=(
-                    ModelMessage(role="system", content=agent.instructions),
-                    ModelMessage(
-                        role="user",
-                        content=context + "\nReturn only JSON: "
-                        '{"policy":"invalidate_all|stale_on_update|stale_on_delete"}',
-                    ),
-                ),
+                messages=messages,
                 max_output_tokens=min(profile.max_output_tokens, budget.max_output_tokens),
                 timeout_seconds=min(profile.timeout_seconds, budget.timeout_seconds),
             )
@@ -244,7 +263,9 @@ class Runtime:
             self.record_response(response, agent, phase, attempt, upper, request)
             self.ensure_running()
             if response.error is None:
-                return Candidate.model_validate_json(response.text or "")
+                if response.completion_state != "completed":
+                    raise ProviderCallFailed("incomplete_or_unsupported_tool_response")
+                return response.text or ""
             if (
                 response.error.billing_uncertain
                 or not response.error.retryable
@@ -252,6 +273,111 @@ class Runtime:
             ):
                 raise ProviderCallFailed(response.error.category)
         raise RuntimeError("Provider attempts exhausted")
+
+    async def local_model_text(
+        self,
+        agent: Agent,
+        phase: str,
+        messages: tuple[ModelMessage, ...],
+        profile: ModelProfile,
+        env: dict[str, str],
+    ) -> str:
+        from doxa.storage.local_dispatch import admit_local
+
+        assert agent.model is not None
+        provider = self.controller.providers.create(profile, env)
+        call_id = self.identity(phase + ":call:0")
+        request = ModelRequest(
+            **self.request_identity(agent, phase, profile, call_id),
+            call_id=call_id,
+            run_id=self.run.id,
+            trajectory_id=self.branch,
+            agent_id=agent.id,
+            assignment=agent.model,
+            messages=messages,
+            max_output_tokens=min(
+                profile.max_output_tokens, self.experiment.budget.max_output_tokens
+            ),
+            timeout_seconds=profile.timeout_seconds,
+        )
+        provider.validate_request(request)
+        record = ModelCall.model_validate(
+            dict(
+                **self.scope(),
+                id=self.identity(phase + ":local-start"),
+                call_id=call_id,
+                agent_id=agent.id,
+                assignment=agent.model,
+                status="started",
+                billing_uncertain=False,
+                request_hash=hashlib.sha256(request.model_dump_json().encode()).hexdigest(),
+                request_settings={
+                    "profile_id": profile.id,
+                    "profile_version": profile.version,
+                    "adapter": profile.runtime,
+                    "location": "loopback",
+                },
+            )
+        )
+        previous = self.ledger.events(self.run.id)[-1]
+        admitted = Event(
+            experiment_id=self.experiment.id,
+            run_id=self.run.id,
+            trajectory_id=self.branch,
+            sequence=1,
+            type=EventType.ACTION_REQUESTED,
+            payload=(record,),
+            actor_id=agent.id,
+            actor_role=agent.role,
+            model=agent.model,
+            parent_event_ids=(previous.id,),
+            expected_cursor=previous.id,
+            expected_trajectory_id=self.branch,
+            idempotency_key=f"{self.run.id}:{phase}:local-start",
+        )
+        admit_local(
+            self.ledger, admitted, profile.concurrency, self.experiment.budget.max_model_calls
+        )
+        try:
+            response = await provider.generate(request)
+        except BaseException:
+            unknown = record.model_copy(
+                update={
+                    "id": self.identity(phase + ":local-uncertain"),
+                    "status": "uncertain",
+                    "error_category": "local_interruption",
+                }
+            )
+            self.emit(phase + ":local-uncertain", EventType.MODEL_CALL_RECORDED, (unknown,))
+            raise
+        self.record_response(response, agent, phase, 0, Decimal("0"), request, local=True)
+        self.ensure_running()
+        if response.error:
+            raise ProviderCallFailed(response.error.category)
+        if response.completion_state != "completed":
+            raise ProviderCallFailed("incomplete_or_unsupported_tool_response")
+        return response.text or ""
+
+    def request_identity(
+        self, agent: Agent, phase: str, profile: ModelProfile, call_id: UUID
+    ) -> dict[str, Any]:
+        from doxa.core.models import ContextManifest
+
+        contexts = [
+            p
+            for e in self.ledger.events(self.run.id)
+            for p in e.payload
+            if isinstance(p, ContextManifest) and p.agent_id == agent.id and p.phase == phase
+        ]
+        return dict(
+            experiment_id=self.experiment.id,
+            profile_id=profile.id,
+            profile_version=profile.version,
+            adapter=profile.runtime,
+            turn_id=phase,
+            context_id=contexts[-1].id if contexts else None,
+            reservation_id=None if profile.local else call_id,
+        )
 
     def record_response(
         self,
@@ -261,7 +387,12 @@ class Runtime:
         attempt: int,
         upper: Decimal,
         request: ModelRequest,
+        local: bool = False,
     ) -> None:
+        # Check before artifact writes; a rejected response leaves dispatch accounting
+        # unresolved rather than publishing a secret or inventing a billing outcome.
+        reject_secrets(response.model_dump_json(), directory=self.controller.settings.data_dir)
+        reject_secrets(request.model_dump_json(), directory=self.controller.settings.data_dir)
         assert agent.model is not None
         record = ModelCall.model_validate(
             dict(
@@ -276,7 +407,7 @@ class Runtime:
                 else None,
                 usage=response.usage.model_copy(
                     update={
-                        "estimated_usd": upper,
+                        "estimated_usd": None if local else upper,
                         "pricing_version": agent.model.pricing_version,
                     }
                 ),
@@ -289,7 +420,21 @@ class Runtime:
                 request_settings={
                     "max_output_tokens": request.max_output_tokens,
                     "timeout_seconds": request.timeout_seconds,
+                    "profile_id": request.profile_id,
+                    "profile_version": request.profile_version,
+                    "adapter": request.adapter,
+                    "turn_id": request.turn_id,
+                    "context_id": str(request.context_id) if request.context_id else None,
                 },
+                request_artifact=self.store.put(
+                    request.model_dump_json().encode(), "application/json"
+                ),
+                response_artifact=self.store.put(
+                    response.model_dump_json().encode(), "application/json"
+                ),
+                finish_reason=response.finish_reason,
+                completion_state=response.completion_state,
+                provider_request_id=response.provider_request_id,
             )
         )
         records: tuple[Record, ...] = (record,)
@@ -312,7 +457,7 @@ class Runtime:
             records,
             agent,
             Provenance.MODEL_OUTPUT,
-            operation_id=response.call_id,
+            operation_id=None if local else response.call_id,
             outcome="completed"
             if response.error is None
             else ("uncertain" if response.error.billing_uncertain else "failed"),
@@ -405,6 +550,14 @@ class Runtime:
         self.emit("restored", EventType.CHECKPOINT_RESTORED)
 
     async def execute(self, command: ExecuteTask) -> "RunBundle":
+        from doxa.storage.workers import worker_lease
+
+        with worker_lease(self.controller.settings.data_dir, self.run.id):
+            self.bundle = self.controller.inspect(self.run.id)
+            self.run = self.bundle.run
+            return await self._execute_owned(command)
+
+    async def _execute_owned(self, command: ExecuteTask) -> "RunBundle":
         self.command = command
         if self.experiment.task_id != "cache-policy" or self.experiment.task_version != "1":
             raise ValueError("This execution path supports only cache-policy v1")

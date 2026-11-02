@@ -43,7 +43,7 @@ the Windows host. The finite task mutates only its prewritten in-memory key/valu
 Run these from the repository root:
 
 ```powershell
-Set-Location 'C:\Users\danad\OneDrive\Documents\ChatGPT\doxadoxadoxa'
+Set-Location 'C:\path\to\doxa'
 .\.venv\Scripts\python.exe -m pip install -e '.[dev]'
 .\.venv\Scripts\doxa.exe init
 .\.venv\Scripts\doxa.exe config-import .\examples\council.json
@@ -62,7 +62,7 @@ Copy the run UUID printed by `configure`:
 In a second PowerShell terminal:
 
 ```powershell
-Set-Location 'C:\Users\danad\OneDrive\Documents\ChatGPT\doxadoxadoxa\studio'
+Set-Location 'C:\path\to\doxa\studio'
 npm.cmd ci
 npm.cmd run dev
 ```

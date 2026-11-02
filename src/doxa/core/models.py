@@ -106,6 +106,8 @@ class Agent(Contract):
     permissions: Permissions = Field(default_factory=Permissions)
     memory_scope: Literal["private", "shared"] = "private"
     accepted_messages: tuple[str, ...] = ()
+    template_id: UUID | None = None
+    template_version: int | None = None
     display_name: str = ""
     instruction_version: str = "1"
     model_profile_id: str | None = None
@@ -124,6 +126,43 @@ class BudgetPolicy(Contract):
     max_reflections_per_branch: int = Field(default=2, ge=0, le=2)
 
 
+class CouncilLimits(Contract):
+    max_agents: int = Field(default=20, ge=1, le=20)
+    rounds: int = Field(default=2, ge=1, le=10)
+    concurrency: int = Field(default=1, ge=1, le=8)
+    max_calls: int = Field(default=20, ge=1, le=200)
+    per_agent_tokens: int = Field(default=16384, ge=256, le=131072)
+    total_tokens: int = Field(default=65536, ge=256, le=1048576)
+    timeout_seconds: float = Field(default=120, gt=0, le=3600)
+    scheduling: Literal["sequential", "round_parallel"] = "sequential"
+
+
+class TaskSpecification(Contract):
+    staged_research: bool = False
+    criticism_strategy: Literal["evidence_gaps", "counterexamples", "source_conflicts"] = (
+        "evidence_gaps"
+    )
+    structured_actions: bool = False
+    required_capabilities: tuple[str, ...] = ()
+    task_type: Literal["cache_policy", "research_debate", "code_repair"] = "research_debate"
+    version: int = Field(default=1, ge=1)
+    question: str = Field(min_length=1, max_length=8000)
+    objective: str = Field(
+        default="Compare arguments and identify unresolved disagreements.", max_length=4000
+    )
+    evaluation_criteria: tuple[str, ...] = ("citation coverage", "explicit uncertainty")
+    required_artifacts: tuple[str, ...] = ("claims", "context manifests")
+    evidence_ids: tuple[UUID, ...] = ()
+    network_mode: Literal[
+        "offline", "approved_search", "approved_fetch", "approved_search_and_fetch"
+    ] = "offline"
+    allowed_domains: tuple[str, ...] = ()
+    max_tool_rounds: int = Field(default=0, ge=0, le=3)
+    max_searches: int = Field(default=0, ge=0, le=20)
+    max_fetches: int = Field(default=0, ge=0, le=20)
+    council: CouncilLimits = Field(default_factory=CouncilLimits)
+
+
 class Experiment(Contract):
     kind: Literal["experiment"] = "experiment"
     id: UUID = Field(default_factory=uuid4)
@@ -136,6 +175,9 @@ class Experiment(Contract):
     initial_snapshot: str | None = None
     agents: tuple[Agent, ...] = ()
     budget: BudgetPolicy = Field(default_factory=BudgetPolicy)
+    task: TaskSpecification | None = None
+    comparison_parent_id: UUID | None = None
+    condition_changes: dict[str, JsonValue] = Field(default_factory=dict)
 
 
 class Run(Contract):
@@ -201,6 +243,8 @@ class Claim(ScopedRecord):
 
 
 class Evidence(ScopedRecord):
+    source_location: str | None = None
+    citation_entailment: Literal["unverified"] = "unverified"
     kind: Literal["evidence"] = "evidence"
     description: str
     source: str
@@ -230,6 +274,10 @@ class Challenge(ScopedRecord):
     response: Literal["accept", "reject", "qualify", "investigate", "defer"] | None = None
     responds_to_id: UUID | None = None
     target_decision_id: UUID | None = None
+    objection_type: Literal["unspecified", "evidence_gap", "contradiction", "method", "scope"] = (
+        "unspecified"
+    )
+    requested_correction: str | None = None
 
 
 class Verification(ScopedRecord):
@@ -305,6 +353,7 @@ class Evaluation(ScopedRecord):
     metrics: dict[str, float | None]
     denominators: dict[str, int] = Field(default_factory=dict)
     usage: Usage = Field(default_factory=Usage)
+    parameters: dict[str, JsonValue] = Field(default_factory=dict)
 
 
 class Annotation(ScopedRecord):
@@ -369,6 +418,7 @@ class RunState(ScopedRecord):
     kind: Literal["run_state"] = "run_state"
     status: Literal["running", "completed", "failed", "cancelled"]
     reason_code: str
+    authorization: ArtifactRef | None = None
 
 
 class TrajectoryState(ScopedRecord):
@@ -386,10 +436,15 @@ class ModelCall(ScopedRecord):
     reported_model_id: str | None = None
     usage: Usage = Field(default_factory=Usage)
     error_category: str | None = None
-    status: Literal["completed", "failed", "uncertain"]
+    status: Literal["started", "completed", "failed", "uncertain"]
     request_hash: str | None = None
     request_settings: dict[str, JsonValue] = Field(default_factory=dict)
     billing_uncertain: bool | None = None
+    request_artifact: ArtifactRef | None = None
+    response_artifact: ArtifactRef | None = None
+    finish_reason: str | None = None
+    completion_state: str | None = None
+    provider_request_id: str | None = None
 
 
 class RetrievalAudit(ScopedRecord):
@@ -405,6 +460,57 @@ class RetrievalAudit(ScopedRecord):
     cost_usd: Decimal | None = Field(default=None, ge=0)
     fallback_reason: str | None = None
     conditions: tuple[str, ...] = ()
+
+
+class SourceDocument(ScopedRecord):
+    kind: Literal["source_document"] = "source_document"
+    title: str = Field(min_length=1, max_length=200)
+    source: str = Field(min_length=1, max_length=2000)
+    content: ArtifactRef
+    visibility: Literal["private", "shared"] = "shared"
+    owner_agent_id: UUID | None = None
+    original: ArtifactRef | None = None
+    parser_version: str = "utf8-text-v1"
+    version: int = Field(default=1, ge=1)
+    revises_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def private_owner(self) -> Self:
+        if self.visibility == "private" and self.owner_agent_id is None:
+            raise ValueError("Private sources require an owner")
+        return self
+
+
+class ContextManifest(ScopedRecord):
+    kind: Literal["context_manifest"] = "context_manifest"
+    agent_id: UUID
+    phase: str
+    instruction_version: str
+    profile_id: str | None = None
+    profile_version: int | None = None
+    task_version: int
+    source_ids: tuple[UUID, ...] = ()
+    memory_ids: tuple[UUID, ...] = ()
+    history_ids: tuple[UUID, ...] = ()
+    messages: ArtifactRef
+    input_token_upper_bound: int = Field(ge=0)
+    tokenizer: Literal["utf8_byte_upper_bound_v1"] = "utf8_byte_upper_bound_v1"
+    selection_strategy: str = "ranked_sources_then_eligible_memory_then_history_v1"
+    omitted: dict[str, str] = Field(default_factory=dict)
+
+
+class ToolAudit(ScopedRecord):
+    kind: Literal["tool_audit"] = "tool_audit"
+    operation_id: UUID
+    agent_id: UUID
+    tool: Literal["web_search", "web_fetch"]
+    query_or_url: str
+    provider: str
+    status: Literal["started", "completed", "failed"]
+    result: ArtifactRef | None = None
+    source_urls: tuple[str, ...] = ()
+    cost_usd: Decimal | None = Field(default=None, ge=0)
+    error_code: str | None = None
 
 
 Record = Annotated[
@@ -425,7 +531,10 @@ Record = Annotated[
     | RunState
     | TrajectoryState
     | ModelCall
-    | RetrievalAudit,
+    | RetrievalAudit
+    | SourceDocument
+    | ContextManifest
+    | ToolAudit,
     # New v1 record discriminators are additive; historical readers retain defaults.
     Field(discriminator="kind"),
 ]

@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from doxa.core.memory_commands import ProposeMemory, TransitionMemory
     from doxa.core.models import Memory, Verification
     from doxa.core.research_commands import Command
+    from doxa.core.text_research import ReviewCommand, ReviewWorkspace
     from doxa.environments.cache_adapter import CacheTaskAdapter
     from doxa.providers.registry import ConfigurationReport, ProviderDescriptor
     from doxa.retrieval.backends import RetrievalBackend
@@ -61,13 +62,31 @@ class Controller:
         self.ledger = Ledger(settings.database_path)
         self.providers = ProviderRegistry()
 
-    def initialize(self) -> None:
+    def initialize(self, *, allow_create: bool = False) -> None:
+        from doxa.core.workspaces import validate_workspace
+
+        if self.settings.database_path.exists():
+            validate_workspace(self.settings.data_dir)
+        if not allow_create:
+            from doxa.core.workspaces import refuse_missing_selection
+
+            refuse_missing_selection(self.settings.data_dir)
         migrate(self.settings.database_path)
 
     def research_command(self, run_id: UUID, branch_id: UUID, command: "Command") -> Event:
         from doxa.core.research import ResearchRuntime
 
         return ResearchRuntime(self, run_id, branch_id).apply(command)
+
+    def review_command(self, run_id: UUID, branch_id: UUID, command: "ReviewCommand") -> Event:
+        from doxa.core.text_research import TextResearch
+
+        return TextResearch(self, run_id, branch_id).apply(command)
+
+    def review_workspace(self, run_id: UUID, branch_id: UUID) -> "ReviewWorkspace":
+        from doxa.core.text_research import TextResearch
+
+        return TextResearch(self, run_id, branch_id).workspace()
 
     def save_configuration(self, config: CouncilConfig) -> None:
         ConfigurationStore(self.settings.database_path).save(config)
@@ -105,7 +124,7 @@ class Controller:
         )
 
     def validate_configuration(self, config: CouncilConfig | None = None) -> "ConfigurationReport":
-        from doxa.core.secrets import local_env
+        from doxa.core.secrets import workspace_env
         from doxa.providers.registry import validate_configuration
 
         config = config if config is not None else self.configuration()
@@ -123,7 +142,8 @@ class Controller:
                 assert isinstance(pinned, ModelProfile)
                 profiles[(pinned.id, pinned.version)] = pinned
         return validate_configuration(
-            config.model_copy(update={"profiles": tuple(profiles.values())}), local_env()
+            config.model_copy(update={"profiles": tuple(profiles.values())}),
+            workspace_env(self.settings.data_dir),
         )
 
     def configure_run(self, command: ConfigureRun) -> Run:
@@ -144,7 +164,11 @@ class Controller:
                     assignment = ModelAssignment(
                         provider=profile.provider,
                         model_id=profile.model_id,
-                        settings={"temperature": profile.temperature},
+                        settings={
+                            "temperature": None
+                            if profile.provider == "openai"
+                            else profile.temperature
+                        },
                         instruction_version=definition.instruction_version,
                         pricing_version=profile.pricing.version if profile.pricing else None,
                     )
@@ -193,12 +217,34 @@ class Controller:
 
     def recover_run(self, run_id: UUID) -> RunBundle:
         from doxa.storage.budget import BudgetStore
+        from doxa.storage.workers import worker_lease
 
         self.inspect(run_id)
-        BudgetStore(self.settings.database_path).recover_interrupted(run_id, self.ledger)
+        with worker_lease(self.settings.data_dir, run_id):
+            BudgetStore(self.settings.database_path).recover_interrupted(run_id, self.ledger)
         return self.inspect(run_id)
 
     def reconcile_charge(self, operation_id: UUID, billed_usd: Decimal) -> None:
+        from doxa.storage.budget import BudgetStore
+        from doxa.storage.workers import worker_lease
+
+        operation = next(
+            (
+                o
+                for o in BudgetStore(self.settings.database_path).operations()
+                if o["id"] == str(operation_id)
+            ),
+            None,
+        )
+        if operation is None:
+            raise ValueError("Unknown provider operation")
+        run_id = UUID(str(operation["run_id"]))
+        with worker_lease(self.settings.data_dir, run_id):
+            if self.inspect(run_id).run.status not in {"completed", "cancelled", "failed"}:
+                raise ValueError("Cancel the interrupted run before billing reconciliation")
+            self._reconcile_charge_owned(operation_id, billed_usd)
+
+    def _reconcile_charge_owned(self, operation_id: UUID, billed_usd: Decimal) -> None:
         from doxa.core.models import Evidence, Provenance
         from doxa.storage.budget import BudgetStore
 
@@ -242,6 +288,68 @@ class Controller:
         )
         budgets.reconcile(operation_id, billed_usd, ledger=self.ledger, event=event)
 
+    def reconcile_local_call(
+        self, call_id: UUID, *, evidence: str, confirmed_stopped: bool
+    ) -> None:
+        """Explicit operator attestation; never a model result or automatic replay."""
+        from doxa.core.models import Evidence, ModelCall, Provenance
+        from doxa.core.secrets import reject_secrets
+        from doxa.storage.workers import worker_lease
+
+        if not confirmed_stopped or not evidence.strip():
+            raise ValueError("Confirm local execution stopped and provide supporting evidence")
+        reject_secrets(evidence, directory=self.settings.data_dir)
+        calls = [
+            c
+            for c in self.ledger.records("model_call")
+            if isinstance(c, ModelCall) and c.call_id == call_id
+        ]
+        if not calls or not any(c.request_settings.get("location") == "loopback" for c in calls):
+            raise ValueError("Unknown unbilled local call")
+        call = calls[-1]
+        with worker_lease(self.settings.data_dir, call.run_id):
+            bundle = self.inspect(call.run_id)
+            if bundle.run.status not in {"cancelled", "failed", "completed"}:
+                raise ValueError("Cancel the run before reconciling local execution")
+            key = f"local-reconciliation:{call_id}"
+            prior = next((e for e in bundle.events if e.idempotency_key == key), None)
+            if prior:
+                if getattr(prior.payload[0], "description", None) != evidence.strip():
+                    raise ValueError("Local reconciliation evidence is immutable")
+                return
+            if call.status not in {"started", "uncertain"}:
+                raise ValueError("Only ambiguous local calls require reconciliation")
+            proof = Evidence(
+                id=uuid5(call_id, "local-stop-evidence"),
+                experiment_id=call.experiment_id,
+                run_id=call.run_id,
+                trajectory_id=call.trajectory_id,
+                provenance=Provenance.HUMAN_ANNOTATION,
+                source="operator-confirmed-local-stop",
+                description=evidence.strip(),
+            )
+            closed = call.model_copy(
+                update={
+                    "id": uuid5(call_id, "local-stop"),
+                    "status": "failed",
+                    "error_category": "operator_confirmed_stopped",
+                    "provenance": Provenance.HUMAN_ANNOTATION,
+                }
+            )
+            self.ledger.append(
+                Event(
+                    experiment_id=call.experiment_id,
+                    run_id=call.run_id,
+                    trajectory_id=call.trajectory_id,
+                    sequence=1,
+                    type=EventType.MODEL_CALL_RECORDED,
+                    provenance=Provenance.HUMAN_ANNOTATION,
+                    payload=(proof, closed),
+                    parent_event_ids=(bundle.events[-1].id,),
+                    idempotency_key=key,
+                )
+            )
+
     def inspect(self, run_id: UUID) -> RunBundle:
         run = self.ledger.get(run_id)
         if not isinstance(run, Run):
@@ -265,6 +373,8 @@ class Controller:
         bundle = self.inspect(run_id)
         if bundle.run.status == "cancelled":
             return bundle
+        if bundle.run.status not in {"configured", "running"}:
+            raise ValueError("Only active runs can be cancelled")
         previous = bundle.events[-1]
         state = RunState(
             id=uuid5(run_id, "operator-cancel"),
@@ -285,6 +395,8 @@ class Controller:
                 payload=(state,),
                 parent_event_ids=(previous.id,),
                 idempotency_key=f"{run_id}:cancel",
+                expected_cursor=previous.id,
+                expected_trajectory_id=previous.trajectory_id,
             )
         )
         return self.inspect(run_id)

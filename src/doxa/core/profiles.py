@@ -2,8 +2,9 @@ from decimal import Decimal
 from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import Field, JsonValue, model_validator
 
+from doxa.core.model_artifacts import ModelArtifact
 from doxa.core.models import Agent, Contract
 from doxa.providers.contracts import Capabilities
 
@@ -28,10 +29,20 @@ class PricingMetadata(Contract):
 
 
 class ModelProfile(Contract):
+    request_protocol: Literal["default", "responses"] = "default"
+    # Explicit, capability-declared wire parameters, never arbitrary HTTP fields.
+    generation_parameters: dict[str, JsonValue] = Field(default_factory=dict)
+    reasoning: dict[str, JsonValue] = Field(default_factory=dict)
+    omit_temperature: bool = False
     id: str = Field(pattern=r"^[a-zA-Z0-9_-]+$")
     version: int = Field(default=1, gt=0)
-    provider: Literal["runpod", "openai_compatible"]
+    provider: str = Field(pattern=r"^[a-z][a-z0-9_-]*$")
+    adapter: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_-]*$")
+    local: bool = False
+    authentication: Literal["bearer", "none"] = "bearer"
     model_id: str = Field(min_length=1)
+    repository_id: str | None = None
+    artifact: ModelArtifact | None = None
     endpoint_id: str | None = None
     base_url: str | None = None
     credential_env: str = Field(default="RUNPOD_API_KEY", pattern=r"^[A-Z][A-Z0-9_]*$")
@@ -45,6 +56,10 @@ class ModelProfile(Contract):
     retries: int = Field(default=0, ge=0, le=3)
     concurrency: int = Field(default=1, ge=1, le=8)
     pricing: PricingMetadata | None = None
+
+    @property
+    def runtime(self) -> str:
+        return self.adapter or self.provider
 
 
 class AgentDefinition(Contract):

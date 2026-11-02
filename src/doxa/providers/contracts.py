@@ -7,7 +7,7 @@ from doxa.core.models import Contract, ModelAssignment, Usage
 
 
 class ProviderConfig(Contract):
-    provider: Literal["runpod", "openai", "gemini", "openai_compatible", "claude"]
+    provider: str
     model_id: str
     base_url: str | None = None
     credential_env: str | None = None  # Name only; credentials never enter contracts.
@@ -15,6 +15,10 @@ class ProviderConfig(Contract):
 
 
 class Capabilities(Contract):
+    text_generation: Literal["available", "unavailable", "unknown"] = "unknown"
+    images: Literal["available", "unavailable", "unknown"] = "unknown"
+    embeddings: Literal["available", "unavailable", "unknown"] = "unknown"
+    sampling_parameters: tuple[str, ...] = ()
     structured_output: Literal["native", "prompted", "unavailable", "unknown"] = "unknown"
     tool_calling: Literal["native", "emulated", "unavailable", "unknown"] = "unknown"
     streaming: bool = False
@@ -31,6 +35,13 @@ class ModelMessage(Contract):
 
 
 class ModelRequest(Contract):
+    experiment_id: UUID | None = None
+    profile_id: str | None = None
+    profile_version: int | None = None
+    adapter: str | None = None
+    turn_id: str | None = None
+    context_id: UUID | None = None
+    reservation_id: UUID | None = None
     call_id: UUID
     run_id: UUID
     trajectory_id: UUID
@@ -40,6 +51,12 @@ class ModelRequest(Contract):
     max_output_tokens: int = Field(gt=0)
     timeout_seconds: float = Field(gt=0)
     response_schema: dict[str, JsonValue] | None = None
+    tools: tuple[dict[str, JsonValue], ...] = ()
+
+
+class OutputBlock(Contract):
+    type: str
+    data: dict[str, JsonValue]
 
 
 class ProviderError(Contract):
@@ -67,6 +84,12 @@ class ModelResponse(Contract):
     execution_kind: Literal["live", "synthetic", "replay"]
     response_id: str | None = None
     reported_model_id: str | None = None
+    provider_request_id: str | None = None
+    blocks: tuple[OutputBlock, ...] = ()
+    tool_requests: tuple[dict[str, JsonValue], ...] = ()
+    finish_reason: str | None = None
+    completion_state: Literal["completed", "incomplete", "tool_request", "refused"] = "completed"
+    raw_response: dict[str, JsonValue] | None = None
 
     @model_validator(mode="after")
     def result_or_error(self) -> Self:

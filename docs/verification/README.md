@@ -27,5 +27,5 @@ for its httpx compatibility path. It does not fail the tests. No warning was hid
 Python 3.12, hosted CI, live providers, actual sandbox execution, checkpoint restoration,
 research outcomes and eventual release acceptance remain unverified/unimplemented.
 
-`studio.png` shows the real local inspector with an explicitly synthetic configured run.
-The UTC event timestamp may show October 24; the user's local Chicago date is October 23.
+Historical graphical screenshots are retained locally and excluded from the terminal-only
+proof-of-concept source tree.

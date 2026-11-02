@@ -5,7 +5,7 @@ from doxa.storage.database import connection, migrate
 from doxa.storage.ledger import Ledger
 
 
-def test_foundation_revision_0001_history_survives_0002_upgrade(tmp_path, command):
+def test_foundation_revision_0001_history_survives_forward_upgrades(tmp_path, command):
     settings = Settings(data_dir=tmp_path)
     migrate(settings.database_path, "0001")
     run = Run(experiment_id=command.experiment.id, mode=command.mode)
@@ -26,7 +26,7 @@ def test_foundation_revision_0001_history_survives_0002_upgrade(tmp_path, comman
     ctrl.initialize()
     assert ctrl.inspect(run.id).events == (saved,)
     with connection(settings.database_path) as db:
-        assert db.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0002"
+        assert db.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0003"
         assert (
             db.execute("SELECT body FROM events WHERE id=?", (str(saved.id),)).fetchone()[0]
             == original

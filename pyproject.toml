@@ -10,11 +10,13 @@ requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1", "pydantic>=2.10,<3", "uvicorn>=0.34,<1",
   "alembic>=1.14,<2", "sqlalchemy>=2.0,<3", "typer>=0.15,<1",
-  "httpx>=0.28,<1", "python-dotenv>=1,<2",
+  "httpx>=0.28,<1", "python-dotenv>=1,<2", "textual==8.2.8", "pypdf==6.21.2",
 ]
 
 [project.optional-dependencies]
-moss = ["moss>=1.16,<2"]
+packaging = ["pyinstaller==6.22.3"]
+tui = ["textual==8.2.8"]
+moss = ["moss>=1.21,<2"]
 dev = ["pytest>=8,<10", "httpx>=0.28,<1", "ruff>=0.11,<1", "mypy>=1.15,<2"]
 
 [project.scripts]
@@ -22,6 +24,7 @@ doxa = "doxa.cli.main:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/doxa"]
+exclude = ["src/doxa/desktop/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -37,3 +40,4 @@ select = ["E", "F", "I", "UP", "B"]
 python_version = "3.12"
 strict = true
 packages = ["doxa"]
+exclude = ["src/doxa/desktop/"]

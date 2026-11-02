@@ -1,7 +1,16 @@
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from doxa.core.models import Claim, Contract, Evaluation, Evidence, Experiment, Trajectory
+from doxa.core.models import (
+    Checkpoint,
+    Claim,
+    Contract,
+    Evaluation,
+    Evidence,
+    Experiment,
+    SourceDocument,
+    Trajectory,
+)
 from doxa.systems.research import CommitmentChange, branch_events, commitment_diff
 
 if TYPE_CHECKING:
@@ -17,6 +26,9 @@ class Comparison(Contract):
     treatment_metrics: dict[str, float | None]
     comparable_task_version: str
     caveat: str = "Descriptive comparison; no causal or model-superiority inference."
+    configuration_differences: tuple[str, ...] = ()
+    evidence_equal: bool = False
+    comparison_kind: str = "descriptive"
 
 
 def compare(controller: "Controller", baseline: UUID, treatment: UUID) -> Comparison:
@@ -43,6 +55,43 @@ def compare(controller: "Controller", baseline: UUID, treatment: UUID) -> Compar
         commitments.append({r.proposition for r in claims if r.id not in superseded})
         evaluations = [r for r in records if isinstance(r, Evaluation)]
         scores.append(evaluations[-1].metrics if evaluations else {})
+    left_config = a.model_dump(
+        mode="json", exclude={"id", "comparison_parent_id", "condition_changes"}
+    )
+    right_config = b.model_dump(
+        mode="json", exclude={"id", "comparison_parent_id", "condition_changes"}
+    )
+
+    def differences(x: object, y: object, prefix: str = "") -> list[str]:
+        if isinstance(x, dict) and isinstance(y, dict):
+            return [
+                v
+                for key in sorted(x.keys() | y.keys())
+                for v in differences(x.get(key), y.get(key), prefix + "." + key)
+            ]
+        return [] if x == y else [prefix.lstrip(".")]
+
+    changed = tuple(differences(left_config, right_config))
+    evidence = []
+    for bundle in (left, right):
+        docs = [p for e in bundle.events for p in e.payload if isinstance(p, SourceDocument)]
+        old_sources = {d.revises_id for d in docs}
+        evidence.append(
+            sorted(
+                (d.content.sha256, d.visibility, str(d.owner_agent_id))
+                for d in docs
+                if d.id not in old_sources
+            )
+        )
+    matched = evidence[0] == evidence[1]
+    kind = "matched_configuration_attempts" if not changed and matched else "descriptive"
+    if (
+        changed == ("task.criticism_strategy",)
+        and matched
+        and b.comparison_parent_id == a.id
+        and b.condition_changes
+    ):
+        kind = "declared_criticism_strategy_condition"
     return Comparison(
         baseline_run_id=baseline,
         treatment_run_id=treatment,
@@ -51,6 +100,9 @@ def compare(controller: "Controller", baseline: UUID, treatment: UUID) -> Compar
         baseline_metrics=scores[0],
         treatment_metrics=scores[1],
         comparable_task_version=a.task_id + ":" + a.task_version,
+        configuration_differences=changed,
+        evidence_equal=matched,
+        comparison_kind=kind,
     )
 
 
@@ -104,6 +156,29 @@ def compare_branches(
         origins.append(json.loads(restores[0].description)["actual_sha256"] if restores else None)
     experiment = controller.ledger.get(events[0].experiment_id)
     assert isinstance(experiment, Experiment)
+    if experiment.task and experiment.task.task_type == "research_debate":
+        from doxa.storage.artifacts import ArtifactStore
+
+        store = ArtifactStore(controller.settings.data_dir / "artifacts")
+        for index, child in enumerate(branches):
+            if isinstance(child, Trajectory) and child.parent_id in (baseline, treatment):
+                checkpoint = (
+                    controller.ledger.get(child.checkpoint_id) if child.checkpoint_id else None
+                )
+                proofs = [
+                    p
+                    for e in events
+                    if e.trajectory_id == child.id
+                    for p in e.payload
+                    if isinstance(p, Evidence)
+                    and p.source == "text-snapshot-integrity-v1"
+                    and p.provenance.value == "deterministic_verifier"
+                ]
+                if isinstance(checkpoint, Checkpoint) and any(
+                    checkpoint.workspace in proof.artifacts for proof in proofs
+                ):
+                    store.get(checkpoint.workspace)
+                    origins[index] = origins[1 - index] = checkpoint.workspace.sha256
     return BranchComparison(
         run_id=run_id,
         baseline_trajectory_id=baseline,

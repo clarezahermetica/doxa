@@ -190,7 +190,92 @@ def test_official_moss_adapter_api_shape_mocked_without_sdk_or_network():
 
     async def scenario():
         await backend.rebuild(())
+        await backend.rebuild(())
+        assert sum(kind == "constructed" for kind, _ in calls) == 1
         assert len(await backend.query("cache", 3)) == 1
+        await backend.close()
+        assert backend.session is None
+        await backend.rebuild(())
+        assert sum(kind == "constructed" for kind, _ in calls) == 2
         await backend.close()
 
     asyncio.run(scenario())
+
+
+def test_moss_disk_sessions_incrementally_add_and_remove_without_cloud_push(controller):
+    import json
+    from pathlib import Path
+
+    run, agent, _, memories = two_agent_fixture(controller)
+    calls = []
+
+    class Session:
+        def __init__(self):
+            self.docs = {}
+
+        async def add_docs(self, docs):
+            calls.append(("add", tuple(d["id"] for d in docs)))
+            self.docs.update({d["id"]: d["text"] for d in docs})
+
+        async def delete_docs(self, ids):
+            calls.append(("delete", tuple(ids)))
+            for identity in ids:
+                self.docs.pop(identity)
+
+        async def get_docs(self):
+            return [SimpleNamespace(id=i, text=t) for i, t in self.docs.items()]
+
+        async def save_to_disk(self, directory):
+            (Path(directory) / "fixture.json").write_text(json.dumps(self.docs))
+
+        async def load_from_disk(self, directory, *, rebuild_legacy):
+            assert rebuild_legacy is False
+            calls.append(("load", ()))
+            self.docs = json.loads((Path(directory) / "fixture.json").read_text())
+
+    class Client:
+        def __init__(self, *args):
+            pass
+
+        async def session(self, **kwargs):
+            assert kwargs == {"index_name": "scoped", "auto_load_on_init": False}
+            return Session()
+
+        async def close(self):
+            pass
+
+    sdk = SimpleNamespace(MossClient=Client, DocumentInfo=lambda **kw: kw)
+    directory = controller.settings.data_dir / "scoped-cache"
+
+    def backend():
+        return MossRetrieval(
+            "fixture-project",
+            "fixture-key",
+            "scoped",
+            authorized=True,
+            sdk_module=sdk,
+            cache_dir=directory,
+        )
+
+    async def scenario():
+        initial = backend()
+        await initial.rebuild((memories[0], memories[2]))
+        # Another same-principal session cannot race the current cache writer.
+        competing = backend()
+        with pytest.raises(OSError):
+            await competing.rebuild((memories[0],))
+        await competing.close()
+        await initial.close()
+        resumed = backend()
+        await resumed.rebuild((memories[2], memories[6]))
+        assert set(resumed.session.docs) == {str(memories[2].id), str(memories[6].id)}
+        await resumed.close()
+        unchanged = backend()
+        await unchanged.rebuild((memories[2], memories[6]))
+        await unchanged.close()
+
+    asyncio.run(scenario())
+    assert ("delete", (str(memories[0].id),)) in calls
+    assert ("add", (str(memories[6].id),)) in calls
+    assert sum(action == "add" for action, _ in calls) == 2
+    assert sum(action == "load" for action, _ in calls) == 2

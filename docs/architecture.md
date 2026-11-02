@@ -1,3 +1,37 @@
+Terminal-only publication: React Studio and native desktop clients are retired and are
+excluded from this source snapshot. The existing Textual application, CLI, controller,
+local API and canonical ledger remain. Older GUI descriptions below are historical.
+
+Pass 3 execution addendum: [model-backed research report](verification/pass3-model-execution.md)
+documents explicit native/compatible protocols, staged Council rounds, version-pinned context,
+launch authorization, conservative unknown outcomes and complete archive export. These extend
+the same controller/ledger. Mock-provider acceptance does not establish live model compatibility.
+GUI development remains frozen.
+
+Pass 1 storage/recovery addendum: [stabilization report](verification/pass1-stabilization.md)
+documents explicit workspace selection, transactional DDL upgrades, OS-held per-run worker
+ownership, conservative uncertain-call recovery, projection verification and verified
+non-overwriting backup/restore. These extend the same controller and canonical workspace
+ledger; they add no research database or alternate engine.
+
+Terminal-first direction: [terminal-first.md](terminal-first.md) describes the existing
+Textual client as primary, shared workspace selection, extensible model/runtime bindings,
+unbilled loopback dispatch, structured research proposals and credential isolation.
+Studio and desktop code are retained with active UI development frozen. Historical
+architecture descriptions follow; there is still one authoritative experimental ledger.
+
+Follow-up addendum: [workbench.md](workbench.md) documents branch-scoped human research
+operations, pinned text-history restores, persistent FTS5 migration 0003, isolated PDF/DOCX
+extraction, bounded structured tool follow-ups and principal-scoped local Moss snapshots.
+These remain controller-owned operations on the same ledger; none creates a second
+source of research truth. Historical architecture descriptions follow.
+
+Research-workbench addendum: [workbench.md](workbench.md) describes the text-only
+Council runtime, instance ancestry, source/context records, guarded native text
+providers, loopback SSE and desktop shell. All persist through the same controller
+and canonical ledger. [status.md](status.md) distinguishes verified preview scope
+from remaining release requirements. Historical architecture descriptions follow.
+
 Infrastructure addendum: [windows-setup.md](windows-setup.md) documents provider
 registry/readiness, safe response parsing, atomic operation+event commits, explicit
 recovery/reconciliation, the finite TaskEnvironment implementation and inspection UI.

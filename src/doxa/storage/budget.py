@@ -2,8 +2,17 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID, uuid5
 
-from doxa.core.models import Event, EventType, Evidence, Experiment, Provenance, Run, RunState
-from doxa.storage.database import connection
+from doxa.core.models import (
+    Event,
+    EventType,
+    Evidence,
+    Experiment,
+    ModelCall,
+    Provenance,
+    Run,
+    RunState,
+)
+from doxa.storage.database import connection, require_active_run
 from doxa.storage.ledger import Ledger, record_adapter
 
 
@@ -121,6 +130,10 @@ class BudgetStore:
             ).fetchone()
             if row is None or row[1] != "prepared":
                 raise BudgetExceeded("Operation already dispatched or requires reconciliation")
+            owner = db.execute(
+                "SELECT run_id FROM reservations WHERE id=?", (str(operation_id),)
+            ).fetchone()
+            require_active_run(db, owner[0])
             uncertain = db.execute(
                 "SELECT COUNT(*) FROM operations WHERE service=? AND state='uncertain'", (row[0],)
             ).fetchone()[0]
@@ -264,6 +277,38 @@ class BudgetStore:
                 )
                 db.execute("UPDATE operations SET state=? WHERE id=?", (outcome, identity))
                 previous = ledger._append(event, db)
+
+            local: dict[UUID, ModelCall] = {}
+            for row in db.execute(
+                "SELECT body FROM records WHERE run_id=? AND kind='model_call' ORDER BY rowid",
+                (str(run_id),),
+            ):
+                call = ModelCall.model_validate_json(row[0])
+                local[call.call_id] = call
+            for call in local.values():
+                if call.status != "started" or call.request_settings.get("location") != "loopback":
+                    continue
+                uncertain = call.model_copy(
+                    update={
+                        "id": uuid5(call.call_id, "interrupted-local"),
+                        "status": "uncertain",
+                        "error_category": "worker_interrupted_execution_unknown",
+                    }
+                )
+                previous = ledger._append(
+                    Event(
+                        id=uuid5(call.call_id, "interrupted-local-event"),
+                        experiment_id=call.experiment_id,
+                        run_id=run_id,
+                        trajectory_id=call.trajectory_id,
+                        sequence=1,
+                        type=EventType.MODEL_CALL_RECORDED,
+                        parent_event_ids=(previous.id,),
+                        idempotency_key=f"local-recovery:{call.call_id}",
+                        payload=(uncertain,),
+                    ),
+                    db,
+                )
 
     def settle(self, operation_id: UUID, billed_usd: Decimal | None) -> None:
         if billed_usd is None:

@@ -6,7 +6,7 @@ from uuid import UUID, uuid5
 from pydantic import Field
 
 from doxa.core.models import Contract, Memory
-from doxa.core.secrets import local_env
+from doxa.core.secrets import workspace_env
 from doxa.retrieval.backends import MossRetrieval
 from doxa.storage.budget import BudgetStore
 from doxa.systems.memory import eligible
@@ -34,7 +34,7 @@ async def query(
             run_id, command.agent_id, command.query, conditions=command.conditions
         )
     controller.participant_records(run_id, command.agent_id)
-    env = local_env()
+    env = workspace_env(controller.settings.data_dir)
     if env.get("DOXA_MOSS_ENABLED", "false").lower() != "true" or not command.authorize_paid:
         raise PermissionError("Moss is disabled or live authorization is missing")
     if command.upper_bound_usd is None:
@@ -58,7 +58,13 @@ async def query(
     )
     budgets.dispatch_once(identity)
     backend = MossRetrieval(
-        project_id, project_key, f"doxa-{run_id}-{command.agent_id}-{identity}", authorized=True
+        project_id,
+        project_key,
+        "eligible-memories",
+        authorized=True,
+        cache_dir=controller.settings.data_dir
+        / "retrieval-cache"
+        / hashlib.sha256(f"{project_id}:{run_id}:{command.agent_id}".encode()).hexdigest(),
     )
     try:
         result = await controller.retrieve_memory(

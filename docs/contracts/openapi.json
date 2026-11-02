@@ -5,6 +5,689 @@
     "version": "0.1.0a0"
   },
   "paths": {
+    "/api/workbench/runs/{run_id}/tools": {
+      "post": {
+        "summary": "Web Tool",
+        "operationId": "web_tool_api_workbench_runs__run_id__tools_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolAudit"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/runs/{run_id}/branches/{branch_id}": {
+      "get": {
+        "summary": "Review Workspace",
+        "operationId": "review_workspace_api_workbench_runs__run_id__branches__branch_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Branch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewWorkspace"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/runs/{run_id}/branches/{branch_id}/commands": {
+      "post": {
+        "summary": "Review Command",
+        "operationId": "review_command_api_workbench_runs__run_id__branches__branch_id__commands_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Branch Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ReviewClaim"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReviewChallenge"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReviewResponse"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReviewDecision"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReviewAnnotation"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReviewCheckpoint"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReviewFork"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReviewEvaluate"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "operation",
+                  "mapping": {
+                    "claim": "#/components/schemas/ReviewClaim",
+                    "challenge": "#/components/schemas/ReviewChallenge",
+                    "respond": "#/components/schemas/ReviewResponse",
+                    "adjudicate": "#/components/schemas/ReviewDecision",
+                    "annotate": "#/components/schemas/ReviewAnnotation",
+                    "checkpoint": "#/components/schemas/ReviewCheckpoint",
+                    "fork": "#/components/schemas/ReviewFork",
+                    "evaluate": "#/components/schemas/ReviewEvaluate"
+                  }
+                },
+                "title": "Command"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/demo": {
+      "post": {
+        "summary": "Offline Demo",
+        "operationId": "offline_demo_api_workbench_demo_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "integer"
+                      }
+                    ]
+                  },
+                  "type": "object",
+                  "title": "Response Offline Demo Api Workbench Demo Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/agents": {
+      "post": {
+        "summary": "New Agent",
+        "operationId": "new_agent_api_workbench_agents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewAgent"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentDefinition-Output"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/experiments": {
+      "post": {
+        "summary": "New Experiment",
+        "operationId": "new_experiment_api_workbench_experiments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewExperiment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/runs/{run_id}/sources": {
+      "post": {
+        "summary": "Ingest Source",
+        "operationId": "ingest_source_api_workbench_runs__run_id__sources_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportSource"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceDocument"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/runs/{run_id}/documents": {
+      "post": {
+        "summary": "Ingest Document",
+        "operationId": "ingest_document_api_workbench_runs__run_id__documents_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportDocument"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceDocument"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/runs/{run_id}/sources/{source_id}": {
+      "get": {
+        "summary": "Source Content",
+        "operationId": "source_content_api_workbench_runs__run_id__sources__source_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Source Content Api Workbench Runs  Run Id  Sources  Source Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/runs/{run_id}/contexts/{manifest_id}": {
+      "get": {
+        "summary": "Context Content",
+        "operationId": "context_content_api_workbench_runs__run_id__contexts__manifest_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "manifest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Manifest Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "title": "Response Context Content Api Workbench Runs  Run Id  Contexts  Manifest Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/runs/{run_id}/claims/revise": {
+      "post": {
+        "summary": "Revise",
+        "operationId": "revise_api_workbench_runs__run_id__claims_revise_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviseClaim"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Claim"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workbench/runs/{run_id}/start": {
+      "post": {
+        "summary": "Start Debate",
+        "operationId": "start_debate_api_workbench_runs__run_id__start_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DebateExecution"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Start Debate Api Workbench Runs  Run Id  Start Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/events": {
+      "get": {
+        "summary": "Events",
+        "operationId": "events_api_runs__run_id__events_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "name": "follow",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Follow"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Health",
@@ -767,6 +1450,15 @@
                       },
                       {
                         "$ref": "#/components/schemas/RetrievalAudit"
+                      },
+                      {
+                        "$ref": "#/components/schemas/SourceDocument"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ContextManifest"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ToolAudit"
                       }
                     ],
                     "discriminator": {
@@ -789,7 +1481,10 @@
                         "run_state": "#/components/schemas/RunState",
                         "trajectory_state": "#/components/schemas/TrajectoryState",
                         "model_call": "#/components/schemas/ModelCall",
-                        "retrieval_audit": "#/components/schemas/RetrievalAudit"
+                        "retrieval_audit": "#/components/schemas/RetrievalAudit",
+                        "source_document": "#/components/schemas/SourceDocument",
+                        "context_manifest": "#/components/schemas/ContextManifest",
+                        "tool_audit": "#/components/schemas/ToolAudit"
                       }
                     }
                   },
@@ -1190,6 +1885,29 @@
             "title": "Accepted Messages",
             "default": []
           },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "template_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Version"
+          },
           "display_name": {
             "type": "string",
             "title": "Display Name",
@@ -1286,6 +2004,29 @@
             "title": "Accepted Messages",
             "default": []
           },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          },
+          "template_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Version"
+          },
           "display_name": {
             "type": "string",
             "title": "Display Name",
@@ -1335,6 +2076,8 @@
           "permissions",
           "memory_scope",
           "accepted_messages",
+          "template_id",
+          "template_version",
           "display_name",
           "instruction_version",
           "model_profile_id",
@@ -2091,6 +2834,44 @@
             "title": "Schema Version",
             "default": 1
           },
+          "text_generation": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "Text Generation",
+            "default": "unknown"
+          },
+          "images": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "Images",
+            "default": "unknown"
+          },
+          "embeddings": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "Embeddings",
+            "default": "unknown"
+          },
+          "sampling_parameters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sampling Parameters",
+            "default": []
+          },
           "structured_output": {
             "type": "string",
             "enum": [
@@ -2169,6 +2950,44 @@
             "title": "Schema Version",
             "default": 1
           },
+          "text_generation": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "Text Generation",
+            "default": "unknown"
+          },
+          "images": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "Images",
+            "default": "unknown"
+          },
+          "embeddings": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable",
+              "unknown"
+            ],
+            "title": "Embeddings",
+            "default": "unknown"
+          },
+          "sampling_parameters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sampling Parameters",
+            "default": []
+          },
           "structured_output": {
             "type": "string",
             "enum": [
@@ -2239,6 +3058,10 @@
         "type": "object",
         "required": [
           "schema_version",
+          "text_generation",
+          "images",
+          "embeddings",
+          "sampling_parameters",
           "structured_output",
           "tool_calling",
           "streaming",
@@ -2390,6 +3213,29 @@
               }
             ],
             "title": "Target Decision Id"
+          },
+          "objection_type": {
+            "type": "string",
+            "enum": [
+              "unspecified",
+              "evidence_gap",
+              "contradiction",
+              "method",
+              "scope"
+            ],
+            "title": "Objection Type",
+            "default": "unspecified"
+          },
+          "requested_correction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Correction"
           }
         },
         "additionalProperties": false,
@@ -2411,7 +3257,9 @@
           "confidence",
           "response",
           "responds_to_id",
-          "target_decision_id"
+          "target_decision_id",
+          "objection_type",
+          "requested_correction"
         ],
         "title": "Challenge"
       },
@@ -3217,6 +4065,24 @@
             "type": "string",
             "title": "Caveat",
             "default": "Descriptive comparison; no causal or model-superiority inference."
+          },
+          "configuration_differences": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Configuration Differences",
+            "default": []
+          },
+          "evidence_equal": {
+            "type": "boolean",
+            "title": "Evidence Equal",
+            "default": false
+          },
+          "comparison_kind": {
+            "type": "string",
+            "title": "Comparison Kind",
+            "default": "descriptive"
           }
         },
         "additionalProperties": false,
@@ -3230,7 +4096,10 @@
           "baseline_metrics",
           "treatment_metrics",
           "comparable_task_version",
-          "caveat"
+          "caveat",
+          "configuration_differences",
+          "evidence_equal",
+          "comparison_kind"
         ],
         "title": "Comparison"
       },
@@ -3320,6 +4189,163 @@
         ],
         "title": "ConfigureRun"
       },
+      "ContextManifest": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "context_manifest",
+            "title": "Kind",
+            "default": "context_manifest"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "phase": {
+            "type": "string",
+            "title": "Phase"
+          },
+          "instruction_version": {
+            "type": "string",
+            "title": "Instruction Version"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
+          },
+          "task_version": {
+            "type": "integer",
+            "title": "Task Version"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Source Ids",
+            "default": []
+          },
+          "memory_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Memory Ids",
+            "default": []
+          },
+          "history_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "History Ids",
+            "default": []
+          },
+          "messages": {
+            "$ref": "#/components/schemas/ArtifactRef-Output"
+          },
+          "input_token_upper_bound": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Input Token Upper Bound"
+          },
+          "tokenizer": {
+            "type": "string",
+            "const": "utf8_byte_upper_bound_v1",
+            "title": "Tokenizer",
+            "default": "utf8_byte_upper_bound_v1"
+          },
+          "selection_strategy": {
+            "type": "string",
+            "title": "Selection Strategy",
+            "default": "ranked_sources_then_eligible_memory_then_history_v1"
+          },
+          "omitted": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Omitted"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "agent_id",
+          "phase",
+          "instruction_version",
+          "profile_id",
+          "profile_version",
+          "task_version",
+          "source_ids",
+          "memory_ids",
+          "history_ids",
+          "messages",
+          "input_token_upper_bound",
+          "tokenizer",
+          "selection_strategy",
+          "omitted"
+        ],
+        "title": "ContextManifest"
+      },
       "CouncilConfig-Input": {
         "properties": {
           "schema_version": {
@@ -3382,6 +4408,159 @@
           "agents"
         ],
         "title": "CouncilConfig"
+      },
+      "CouncilLimits-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "max_agents": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Agents",
+            "default": 20
+          },
+          "rounds": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Rounds",
+            "default": 2
+          },
+          "concurrency": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Concurrency",
+            "default": 1
+          },
+          "max_calls": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Max Calls",
+            "default": 20
+          },
+          "per_agent_tokens": {
+            "type": "integer",
+            "maximum": 131072.0,
+            "minimum": 256.0,
+            "title": "Per Agent Tokens",
+            "default": 16384
+          },
+          "total_tokens": {
+            "type": "integer",
+            "maximum": 1048576.0,
+            "minimum": 256.0,
+            "title": "Total Tokens",
+            "default": 65536
+          },
+          "timeout_seconds": {
+            "type": "number",
+            "maximum": 3600.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout Seconds",
+            "default": 120
+          },
+          "scheduling": {
+            "type": "string",
+            "enum": [
+              "sequential",
+              "round_parallel"
+            ],
+            "title": "Scheduling",
+            "default": "sequential"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CouncilLimits"
+      },
+      "CouncilLimits-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "max_agents": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Agents",
+            "default": 20
+          },
+          "rounds": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Rounds",
+            "default": 2
+          },
+          "concurrency": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Concurrency",
+            "default": 1
+          },
+          "max_calls": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Max Calls",
+            "default": 20
+          },
+          "per_agent_tokens": {
+            "type": "integer",
+            "maximum": 131072.0,
+            "minimum": 256.0,
+            "title": "Per Agent Tokens",
+            "default": 16384
+          },
+          "total_tokens": {
+            "type": "integer",
+            "maximum": 1048576.0,
+            "minimum": 256.0,
+            "title": "Total Tokens",
+            "default": 65536
+          },
+          "timeout_seconds": {
+            "type": "number",
+            "maximum": 3600.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout Seconds",
+            "default": 120
+          },
+          "scheduling": {
+            "type": "string",
+            "enum": [
+              "sequential",
+              "round_parallel"
+            ],
+            "title": "Scheduling",
+            "default": "sequential"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "max_agents",
+          "rounds",
+          "concurrency",
+          "max_calls",
+          "per_agent_tokens",
+          "total_tokens",
+          "timeout_seconds",
+          "scheduling"
+        ],
+        "title": "CouncilLimits"
       },
       "CouncilMessage": {
         "properties": {
@@ -3493,6 +4672,52 @@
           "content"
         ],
         "title": "CouncilMessage"
+      },
+      "DebateExecution": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "authorize_paid": {
+            "type": "boolean",
+            "title": "Authorize Paid",
+            "default": false
+          },
+          "authorize_external": {
+            "type": "boolean",
+            "title": "Authorize External",
+            "default": false
+          },
+          "upper_bound_usd_per_attempt": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 25.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upper Bound Usd Per Attempt"
+          },
+          "synthetic_answers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Synthetic Answers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DebateExecution"
       },
       "Decision": {
         "properties": {
@@ -3833,6 +5058,13 @@
           },
           "usage": {
             "$ref": "#/components/schemas/Usage"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Parameters"
           }
         },
         "additionalProperties": false,
@@ -3849,7 +5081,8 @@
           "baseline_run_id",
           "metrics",
           "denominators",
-          "usage"
+          "usage",
+          "parameters"
         ],
         "title": "Evaluation"
       },
@@ -4002,6 +5235,15 @@
                 },
                 {
                   "$ref": "#/components/schemas/RetrievalAudit"
+                },
+                {
+                  "$ref": "#/components/schemas/SourceDocument"
+                },
+                {
+                  "$ref": "#/components/schemas/ContextManifest"
+                },
+                {
+                  "$ref": "#/components/schemas/ToolAudit"
                 }
               ],
               "discriminator": {
@@ -4011,6 +5253,7 @@
                   "challenge": "#/components/schemas/Challenge",
                   "checkpoint": "#/components/schemas/Checkpoint",
                   "claim": "#/components/schemas/Claim",
+                  "context_manifest": "#/components/schemas/ContextManifest",
                   "council_message": "#/components/schemas/CouncilMessage",
                   "decision": "#/components/schemas/Decision",
                   "evaluation": "#/components/schemas/Evaluation",
@@ -4022,6 +5265,8 @@
                   "retrieval_audit": "#/components/schemas/RetrievalAudit",
                   "run": "#/components/schemas/Run",
                   "run_state": "#/components/schemas/RunState",
+                  "source_document": "#/components/schemas/SourceDocument",
+                  "tool_audit": "#/components/schemas/ToolAudit",
                   "trajectory": "#/components/schemas/Trajectory",
                   "trajectory_state": "#/components/schemas/TrajectoryState",
                   "verification": "#/components/schemas/Verification"
@@ -4164,6 +5409,23 @@
           "provenance": {
             "$ref": "#/components/schemas/Provenance"
           },
+          "source_location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Location"
+          },
+          "citation_entailment": {
+            "type": "string",
+            "const": "unverified",
+            "title": "Citation Entailment",
+            "default": "unverified"
+          },
           "kind": {
             "type": "string",
             "const": "evidence",
@@ -4196,6 +5458,8 @@
           "run_id",
           "trajectory_id",
           "provenance",
+          "source_location",
+          "citation_entailment",
           "kind",
           "description",
           "source",
@@ -4287,6 +5551,20 @@
               }
             ],
             "title": "Upper Bound Usd Per Attempt"
+          },
+          "authorized_allowances": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Authorized Allowances"
           }
         },
         "additionalProperties": false,
@@ -4359,6 +5637,35 @@
           },
           "budget": {
             "$ref": "#/components/schemas/BudgetPolicy-Input"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskSpecification-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "comparison_parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Parent Id"
+          },
+          "condition_changes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Condition Changes"
           }
         },
         "additionalProperties": false,
@@ -4439,6 +5746,35 @@
           },
           "budget": {
             "$ref": "#/components/schemas/BudgetPolicy-Output"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskSpecification-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "comparison_parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Parent Id"
+          },
+          "condition_changes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Condition Changes"
           }
         },
         "additionalProperties": false,
@@ -4455,7 +5791,10 @@
           "evaluator_version",
           "initial_snapshot",
           "agents",
-          "budget"
+          "budget",
+          "task",
+          "comparison_parent_id",
+          "condition_changes"
         ],
         "title": "Experiment"
       },
@@ -4520,6 +5859,154 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "ImportDocument": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Filename"
+          },
+          "data_base64": {
+            "type": "string",
+            "maxLength": 14000000,
+            "minLength": 1,
+            "title": "Data Base64"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "title": "Visibility",
+            "default": "shared"
+          },
+          "owner_agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Agent Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "filename",
+          "data_base64",
+          "idempotency_key"
+        ],
+        "title": "ImportDocument"
+      },
+      "ImportSource": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "original": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parser_version": {
+            "type": "string",
+            "title": "Parser Version",
+            "default": "utf8-text-v1"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Source",
+            "default": "local import"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 1000000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "title": "Visibility",
+            "default": "shared"
+          },
+          "owner_agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Agent Id"
+          },
+          "revises_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revises Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "text",
+          "idempotency_key"
+        ],
+        "title": "ImportSource"
       },
       "InstallationReadiness": {
         "properties": {
@@ -4774,6 +6261,89 @@
         ],
         "title": "Memory"
       },
+      "ModelArtifact-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "default": "gguf"
+          },
+          "execution_verified": {
+            "type": "boolean",
+            "title": "Execution Verified",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "path",
+          "sha256",
+          "bytes"
+        ],
+        "title": "ModelArtifact"
+      },
+      "ModelArtifact-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "default": "gguf"
+          },
+          "execution_verified": {
+            "type": "boolean",
+            "title": "Execution Verified",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "path",
+          "sha256",
+          "bytes",
+          "format",
+          "execution_verified"
+        ],
+        "title": "ModelArtifact"
+      },
       "ModelAssignment-Input": {
         "properties": {
           "schema_version": {
@@ -4962,6 +6532,7 @@
           "status": {
             "type": "string",
             "enum": [
+              "started",
               "completed",
               "failed",
               "uncertain"
@@ -4996,6 +6567,59 @@
               }
             ],
             "title": "Billing Uncertain"
+          },
+          "request_artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "response_artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "completion_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion State"
+          },
+          "provider_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Request Id"
           }
         },
         "additionalProperties": false,
@@ -5018,7 +6642,12 @@
           "status",
           "request_hash",
           "request_settings",
-          "billing_uncertain"
+          "billing_uncertain",
+          "request_artifact",
+          "response_artifact",
+          "finish_reason",
+          "completion_state",
+          "provider_request_id"
         ],
         "title": "ModelCall"
       },
@@ -5029,6 +6658,34 @@
             "const": 1,
             "title": "Schema Version",
             "default": 1
+          },
+          "request_protocol": {
+            "type": "string",
+            "enum": [
+              "default",
+              "responses"
+            ],
+            "title": "Request Protocol",
+            "default": "default"
+          },
+          "generation_parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Generation Parameters"
+          },
+          "reasoning": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Reasoning"
+          },
+          "omit_temperature": {
+            "type": "boolean",
+            "title": "Omit Temperature",
+            "default": false
           },
           "id": {
             "type": "string",
@@ -5043,16 +6700,60 @@
           },
           "provider": {
             "type": "string",
-            "enum": [
-              "runpod",
-              "openai_compatible"
-            ],
+            "pattern": "^[a-z][a-z0-9_-]*$",
             "title": "Provider"
+          },
+          "adapter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter"
+          },
+          "local": {
+            "type": "boolean",
+            "title": "Local",
+            "default": false
+          },
+          "authentication": {
+            "type": "string",
+            "enum": [
+              "bearer",
+              "none"
+            ],
+            "title": "Authentication",
+            "default": "bearer"
           },
           "model_id": {
             "type": "string",
             "minLength": 1,
             "title": "Model Id"
+          },
+          "repository_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Id"
+          },
+          "artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelArtifact-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "endpoint_id": {
             "anyOf": [
@@ -5167,6 +6868,34 @@
             "title": "Schema Version",
             "default": 1
           },
+          "request_protocol": {
+            "type": "string",
+            "enum": [
+              "default",
+              "responses"
+            ],
+            "title": "Request Protocol",
+            "default": "default"
+          },
+          "generation_parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Generation Parameters"
+          },
+          "reasoning": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Reasoning"
+          },
+          "omit_temperature": {
+            "type": "boolean",
+            "title": "Omit Temperature",
+            "default": false
+          },
           "id": {
             "type": "string",
             "pattern": "^[a-zA-Z0-9_-]+$",
@@ -5180,16 +6909,60 @@
           },
           "provider": {
             "type": "string",
-            "enum": [
-              "runpod",
-              "openai_compatible"
-            ],
+            "pattern": "^[a-z][a-z0-9_-]*$",
             "title": "Provider"
+          },
+          "adapter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter"
+          },
+          "local": {
+            "type": "boolean",
+            "title": "Local",
+            "default": false
+          },
+          "authentication": {
+            "type": "string",
+            "enum": [
+              "bearer",
+              "none"
+            ],
+            "title": "Authentication",
+            "default": "bearer"
           },
           "model_id": {
             "type": "string",
             "minLength": 1,
             "title": "Model Id"
+          },
+          "repository_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Id"
+          },
+          "artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelArtifact-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "endpoint_id": {
             "anyOf": [
@@ -5291,10 +7064,19 @@
         "type": "object",
         "required": [
           "schema_version",
+          "request_protocol",
+          "generation_parameters",
+          "reasoning",
+          "omit_temperature",
           "id",
           "version",
           "provider",
+          "adapter",
+          "local",
+          "authentication",
           "model_id",
+          "repository_id",
+          "artifact",
           "endpoint_id",
           "base_url",
           "credential_env",
@@ -5310,6 +7092,197 @@
           "pricing"
         ],
         "title": "ModelProfile"
+      },
+      "NewAgent": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "memory_scope": {
+            "type": "string",
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "title": "Memory Scope",
+            "default": "private"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "executor",
+              "skeptic",
+              "researcher",
+              "archivist"
+            ],
+            "title": "Role"
+          },
+          "instructions": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Instructions"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "profile_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Version"
+          },
+          "remote_inference": {
+            "type": "boolean",
+            "title": "Remote Inference",
+            "default": false
+          },
+          "allowed_tools": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "web_search",
+                "web_fetch"
+              ]
+            },
+            "type": "array",
+            "title": "Allowed Tools",
+            "default": []
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "display_name",
+          "role",
+          "instructions"
+        ],
+        "title": "NewAgent"
+      },
+      "NewExperiment": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "task": {
+            "$ref": "#/components/schemas/TaskSpecification-Input"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ProtocolMode",
+            "default": "adversarial_multi_agent"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantGroup"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Participants"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/BudgetPolicy-Input"
+          },
+          "execution_kind": {
+            "type": "string",
+            "enum": [
+              "synthetic",
+              "live"
+            ],
+            "title": "Execution Kind",
+            "default": "synthetic"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "task",
+          "participants",
+          "idempotency_key"
+        ],
+        "title": "NewExperiment"
+      },
+      "ParticipantGroup": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Count",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_id"
+        ],
+        "title": "ParticipantGroup"
       },
       "Permissions-Input": {
         "properties": {
@@ -6287,6 +8260,633 @@
         ],
         "title": "RetrievalQuery"
       },
+      "ReviewAnnotation": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Reviewer Id",
+            "default": "local-operator"
+          },
+          "operation": {
+            "type": "string",
+            "const": "annotate",
+            "title": "Operation",
+            "default": "annotate"
+          },
+          "subject_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Subject Id"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 8000,
+            "title": "Notes",
+            "default": ""
+          },
+          "dimensions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Dimensions"
+          },
+          "other_trajectory_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Trajectory Id"
+          },
+          "preference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "A",
+                  "B",
+                  "tie",
+                  "neither"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preference"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "subject_id"
+        ],
+        "title": "ReviewAnnotation"
+      },
+      "ReviewChallenge": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Reviewer Id",
+            "default": "local-operator"
+          },
+          "operation": {
+            "type": "string",
+            "const": "challenge",
+            "title": "Operation",
+            "default": "challenge"
+          },
+          "claim_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Claim Id"
+          },
+          "critic_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Critic Id"
+          },
+          "objection": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Objection"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Source Ids",
+            "default": []
+          },
+          "objection_type": {
+            "type": "string",
+            "enum": [
+              "unspecified",
+              "evidence_gap",
+              "contradiction",
+              "method",
+              "scope"
+            ],
+            "title": "Objection Type",
+            "default": "unspecified"
+          },
+          "requested_correction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Correction"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "claim_id",
+          "critic_id",
+          "objection"
+        ],
+        "title": "ReviewChallenge"
+      },
+      "ReviewCheckpoint": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Reviewer Id",
+            "default": "local-operator"
+          },
+          "operation": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Operation",
+            "default": "checkpoint"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key"
+        ],
+        "title": "ReviewCheckpoint"
+      },
+      "ReviewClaim": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Reviewer Id",
+            "default": "local-operator"
+          },
+          "operation": {
+            "type": "string",
+            "const": "claim",
+            "title": "Operation",
+            "default": "claim"
+          },
+          "author_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Author Id"
+          },
+          "proposition": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Proposition"
+          },
+          "revises_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revises Id"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Source Ids",
+            "default": []
+          },
+          "dependency_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Dependency Ids",
+            "default": []
+          },
+          "citation_spans": {
+            "additionalProperties": {
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "type": "object",
+            "title": "Citation Spans"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "author_id",
+          "proposition"
+        ],
+        "title": "ReviewClaim"
+      },
+      "ReviewDecision": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Reviewer Id",
+            "default": "local-operator"
+          },
+          "operation": {
+            "type": "string",
+            "const": "adjudicate",
+            "title": "Operation",
+            "default": "adjudicate"
+          },
+          "challenge_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Challenge Id"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "retain",
+              "qualify",
+              "revise",
+              "investigate",
+              "abstain"
+            ],
+            "title": "Outcome"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "challenge_id",
+          "outcome",
+          "reason"
+        ],
+        "title": "ReviewDecision"
+      },
+      "ReviewEvaluate": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Reviewer Id",
+            "default": "local-operator"
+          },
+          "operation": {
+            "type": "string",
+            "const": "evaluate",
+            "title": "Operation",
+            "default": "evaluate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key"
+        ],
+        "title": "ReviewEvaluate"
+      },
+      "ReviewFork": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Reviewer Id",
+            "default": "local-operator"
+          },
+          "operation": {
+            "type": "string",
+            "const": "fork",
+            "title": "Operation",
+            "default": "fork"
+          },
+          "checkpoint_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Checkpoint Id"
+          },
+          "intervention": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Intervention"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "checkpoint_id",
+          "intervention"
+        ],
+        "title": "ReviewFork"
+      },
+      "ReviewResponse": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Reviewer Id",
+            "default": "local-operator"
+          },
+          "operation": {
+            "type": "string",
+            "const": "respond",
+            "title": "Operation",
+            "default": "respond"
+          },
+          "challenge_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Challenge Id"
+          },
+          "author_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Author Id"
+          },
+          "response": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "reject",
+              "qualify",
+              "investigate",
+              "defer"
+            ],
+            "title": "Response"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "revised_proposition": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revised Proposition"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "challenge_id",
+          "author_id",
+          "response",
+          "reason"
+        ],
+        "title": "ReviewResponse"
+      },
+      "ReviewWorkspace": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "branch": {
+            "$ref": "#/components/schemas/Trajectory"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "current_claims": {
+            "items": {
+              "$ref": "#/components/schemas/Claim"
+            },
+            "type": "array",
+            "title": "Current Claims"
+          },
+          "unresolved_challenges": {
+            "items": {
+              "$ref": "#/components/schemas/Challenge"
+            },
+            "type": "array",
+            "title": "Unresolved Challenges"
+          },
+          "checkpoints": {
+            "items": {
+              "$ref": "#/components/schemas/Checkpoint"
+            },
+            "type": "array",
+            "title": "Checkpoints"
+          },
+          "annotations": {
+            "items": {
+              "$ref": "#/components/schemas/Annotation"
+            },
+            "type": "array",
+            "title": "Annotations"
+          },
+          "caveat": {
+            "type": "string",
+            "title": "Caveat",
+            "default": "Human review and model assertions do not establish independent truth."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "branch",
+          "events",
+          "current_claims",
+          "unresolved_challenges",
+          "checkpoints",
+          "annotations",
+          "caveat"
+        ],
+        "title": "ReviewWorkspace"
+      },
+      "ReviseClaim": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "claim_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Claim Id"
+          },
+          "proposition": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Proposition"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "claim_id",
+          "proposition",
+          "idempotency_key"
+        ],
+        "title": "ReviseClaim"
+      },
       "Role": {
         "type": "string",
         "enum": [
@@ -6462,6 +9062,16 @@
           "reason_code": {
             "type": "string",
             "title": "Reason Code"
+          },
+          "authorization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -6475,7 +9085,8 @@
           "provenance",
           "kind",
           "status",
-          "reason_code"
+          "reason_code",
+          "authorization"
         ],
         "title": "RunState"
       },
@@ -6510,6 +9121,629 @@
           "prerequisite"
         ],
         "title": "SandboxStatus"
+      },
+      "SourceDocument": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "source_document",
+            "title": "Kind",
+            "default": "source_document"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Source"
+          },
+          "content": {
+            "$ref": "#/components/schemas/ArtifactRef-Output"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "shared"
+            ],
+            "title": "Visibility",
+            "default": "shared"
+          },
+          "owner_agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Agent Id"
+          },
+          "original": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parser_version": {
+            "type": "string",
+            "title": "Parser Version",
+            "default": "utf8-text-v1"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version",
+            "default": 1
+          },
+          "revises_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revises Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "title",
+          "source",
+          "content",
+          "visibility",
+          "owner_agent_id",
+          "original",
+          "parser_version",
+          "version",
+          "revises_id"
+        ],
+        "title": "SourceDocument"
+      },
+      "TaskSpecification-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "staged_research": {
+            "type": "boolean",
+            "title": "Staged Research",
+            "default": false
+          },
+          "criticism_strategy": {
+            "type": "string",
+            "enum": [
+              "evidence_gaps",
+              "counterexamples",
+              "source_conflicts"
+            ],
+            "title": "Criticism Strategy",
+            "default": "evidence_gaps"
+          },
+          "structured_actions": {
+            "type": "boolean",
+            "title": "Structured Actions",
+            "default": false
+          },
+          "required_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Capabilities",
+            "default": []
+          },
+          "task_type": {
+            "type": "string",
+            "enum": [
+              "cache_policy",
+              "research_debate",
+              "code_repair"
+            ],
+            "title": "Task Type",
+            "default": "research_debate"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version",
+            "default": 1
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "objective": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Objective",
+            "default": "Compare arguments and identify unresolved disagreements."
+          },
+          "evaluation_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evaluation Criteria",
+            "default": [
+              "citation coverage",
+              "explicit uncertainty"
+            ]
+          },
+          "required_artifacts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Artifacts",
+            "default": [
+              "claims",
+              "context manifests"
+            ]
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Evidence Ids",
+            "default": []
+          },
+          "network_mode": {
+            "type": "string",
+            "enum": [
+              "offline",
+              "approved_search",
+              "approved_fetch",
+              "approved_search_and_fetch"
+            ],
+            "title": "Network Mode",
+            "default": "offline"
+          },
+          "allowed_domains": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Domains",
+            "default": []
+          },
+          "max_tool_rounds": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Max Tool Rounds",
+            "default": 0
+          },
+          "max_searches": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Max Searches",
+            "default": 0
+          },
+          "max_fetches": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Max Fetches",
+            "default": 0
+          },
+          "council": {
+            "$ref": "#/components/schemas/CouncilLimits-Input"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "TaskSpecification"
+      },
+      "TaskSpecification-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "staged_research": {
+            "type": "boolean",
+            "title": "Staged Research",
+            "default": false
+          },
+          "criticism_strategy": {
+            "type": "string",
+            "enum": [
+              "evidence_gaps",
+              "counterexamples",
+              "source_conflicts"
+            ],
+            "title": "Criticism Strategy",
+            "default": "evidence_gaps"
+          },
+          "structured_actions": {
+            "type": "boolean",
+            "title": "Structured Actions",
+            "default": false
+          },
+          "required_capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Capabilities",
+            "default": []
+          },
+          "task_type": {
+            "type": "string",
+            "enum": [
+              "cache_policy",
+              "research_debate",
+              "code_repair"
+            ],
+            "title": "Task Type",
+            "default": "research_debate"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version",
+            "default": 1
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "objective": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Objective",
+            "default": "Compare arguments and identify unresolved disagreements."
+          },
+          "evaluation_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evaluation Criteria",
+            "default": [
+              "citation coverage",
+              "explicit uncertainty"
+            ]
+          },
+          "required_artifacts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Artifacts",
+            "default": [
+              "claims",
+              "context manifests"
+            ]
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Evidence Ids",
+            "default": []
+          },
+          "network_mode": {
+            "type": "string",
+            "enum": [
+              "offline",
+              "approved_search",
+              "approved_fetch",
+              "approved_search_and_fetch"
+            ],
+            "title": "Network Mode",
+            "default": "offline"
+          },
+          "allowed_domains": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Domains",
+            "default": []
+          },
+          "max_tool_rounds": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Max Tool Rounds",
+            "default": 0
+          },
+          "max_searches": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Max Searches",
+            "default": 0
+          },
+          "max_fetches": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Max Fetches",
+            "default": 0
+          },
+          "council": {
+            "$ref": "#/components/schemas/CouncilLimits-Output"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "staged_research",
+          "criticism_strategy",
+          "structured_actions",
+          "required_capabilities",
+          "task_type",
+          "version",
+          "question",
+          "objective",
+          "evaluation_criteria",
+          "required_artifacts",
+          "evidence_ids",
+          "network_mode",
+          "allowed_domains",
+          "max_tool_rounds",
+          "max_searches",
+          "max_fetches",
+          "council"
+        ],
+        "title": "TaskSpecification"
+      },
+      "ToolAudit": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "tool_audit",
+            "title": "Kind",
+            "default": "tool_audit"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Operation Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "tool": {
+            "type": "string",
+            "enum": [
+              "web_search",
+              "web_fetch"
+            ],
+            "title": "Tool"
+          },
+          "query_or_url": {
+            "type": "string",
+            "title": "Query Or Url"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "started",
+              "completed",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "default": []
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "operation_id",
+          "agent_id",
+          "tool",
+          "query_or_url",
+          "provider",
+          "status",
+          "result",
+          "source_urls",
+          "cost_usd",
+          "error_code"
+        ],
+        "title": "ToolAudit"
+      },
+      "ToolRequest": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "tool": {
+            "type": "string",
+            "enum": [
+              "web_search",
+              "web_fetch"
+            ],
+            "title": "Tool"
+          },
+          "query_or_url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Query Or Url"
+          },
+          "authorize_external": {
+            "type": "boolean",
+            "title": "Authorize External",
+            "default": false
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_id",
+          "tool",
+          "query_or_url",
+          "idempotency_key"
+        ],
+        "title": "ToolRequest"
       },
       "Trajectory": {
         "properties": {

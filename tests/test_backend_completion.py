@@ -125,6 +125,9 @@ def test_registry_readiness_is_local_only_and_preserves_unknown_credit_balance()
     assert {d.provider for d in registry.descriptors() if d.implemented} == {
         "runpod",
         "openai_compatible",
+        "openai",
+        "claude",
+        "gemini",
     }
     result = readiness(profile(), environment())
     assert result.status == "ready_for_authorized_test" and result.credit_balance_usd is None
@@ -413,7 +416,7 @@ def test_complete_operation_price_can_reserve_but_token_rates_cannot_estimate_ru
 
 
 def test_budget_exhaustion_prevents_transport_and_uncertainty_overrides_concurrency(
-    controller, monkeypatch
+    controller, monkeypatch, command
 ):
     run = live_run(
         controller, monkeypatch, lambda req: pytest.fail("No paid transport allowed"), token_cap=0
@@ -425,6 +428,9 @@ def test_budget_exhaustion_prevents_transport_and_uncertainty_overrides_concurre
             )
         )
     budget = BudgetStore(controller.settings.database_path)
+    # Admission on a terminal run is now forbidden; test service uncertainty on
+    # a separate configured run, independently from the failed budget attempt.
+    run = controller.configure_run(command)
     a, b = uuid4(), uuid4()
     for identity in (a, b):
         budget.reserve(
@@ -532,7 +538,11 @@ def test_fresh_cli_api_start_without_credentials_or_container(controller, tmp_pa
     folder = tmp_path / "fresh"
     assert runner.invoke(app, ["init", "--data-dir", str(folder)]).exit_code == 0
     for name in ("doctor", "validate-config", "agents", "profiles", "providers"):
-        result = runner.invoke(app, [name, "--data-dir", str(folder)])
+        result = runner.invoke(
+            app,
+            [name, "--data-dir", str(folder)]
+            + (["--json"] if name in {"doctor", "agents", "profiles"} else []),
+        )
         assert result.exit_code == 0, result.output
         json.loads(result.output)
     with TestClient(create_app(Settings(data_dir=folder))) as client:

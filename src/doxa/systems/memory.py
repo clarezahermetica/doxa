@@ -64,7 +64,7 @@ async def retrieve(
     events = ledger.events(run_id)
     if not events:
         raise KeyError(str(run_id))
-    baseline = LocalRetrieval()
+    baseline = LocalRetrieval(ledger.path)
     chosen = backend or baseline
     fallback: str | None = None
     authorized = eligible(ledger, run_id, agent_id, conditions)

@@ -1,14 +1,15 @@
 # Windows setup and optional RunPod inference
 
-README is intentionally empty. These instructions concern infrastructure, not
-completion of the six research algorithms or the generated-code release gate.
+For the supported terminal installation and launch, start with [README](../README.md).
+These additional instructions concern optional infrastructure, not completion of the
+six research algorithms or the generated-code release gate.
 
 ## Offline installation
 
 Use Python 3.12 or newer. From PowerShell:
 
 ```powershell
-Set-Location 'C:\Users\danad\OneDrive\Documents\ChatGPT\doxadoxadoxa'
+Set-Location 'C:\path\to\doxa'
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e '.[dev]'
 if (!(Test-Path -LiteralPath .env)) { Copy-Item -LiteralPath .env.example -Destination .env }
@@ -36,20 +37,14 @@ Copy the configured run ID, then run the supported built-in finite fixture:
 .\.venv\Scripts\doxa.exe serve
 ```
 
-In another PowerShell terminal:
+To open the interactive terminal instead of the optional local API:
 
 ```powershell
-Set-Location 'C:\Users\danad\OneDrive\Documents\ChatGPT\doxadoxadoxa\studio'
-npm.cmd ci
-npm.cmd run dev
+.\.venv\Scripts\doxa.exe
 ```
 
-`npm.cmd` avoids PowerShell's `npm.ps1` execution-policy issue. Do not change the
-machine's execution policy to install Studio. Studio is at `http://127.0.0.1:5173/`;
-its `/api` proxy uses the local API at `http://127.0.0.1:8000`. API requests and the
-CLI read the same SQLite ledger. Restart the local API after backend contract changes.
-The UI's Refresh ledger button reloads real records and readiness; it does not probe
-an inference endpoint. Never put credentials in a `VITE_` environment variable.
+The terminal and CLI read the same selected workspace. Studio and the graphical desktop
+are retired from this publication; Node.js and a browser are not required.
 
 ## Optional RunPod path (manual, no deployment performed)
 

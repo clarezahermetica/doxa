@@ -27,7 +27,7 @@ def test_cli_http_export_agree_and_execution_is_explicitly_unavailable(
     result = runner.invoke(app, ["configure", str(config), "--data-dir", str(tmp_path)])
     assert result.exit_code == 0, result.output
     run_id = json.loads(result.output)["id"]
-    cli = runner.invoke(app, ["inspect", run_id, "--data-dir", str(tmp_path)])
+    cli = runner.invoke(app, ["inspect", run_id, "--data-dir", str(tmp_path), "--json"])
     assert cli.exit_code == 0, cli.output
     with TestClient(create_app(Settings(data_dir=tmp_path))) as client:
         bundle = client.get(f"/api/runs/{run_id}").json()
@@ -47,7 +47,7 @@ def test_cli_http_export_agree_and_execution_is_explicitly_unavailable(
                     "access-control-request-method": "POST",
                 },
             ).status_code
-            == 405
+            == 403
         )
     assert len(bundle["events"]) == 1
 

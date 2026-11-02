@@ -42,3 +42,27 @@ exports/
 .hf/
 tmp/
 temp/
+
+# Desktop packaging output.
+build/
+
+# Terminal workspace credentials and local runtime controls.
+credentials/
+*.dpapi
+runtime-settings.json
+*.gguf
+*.safetensors
+
+# Retired graphical clients and local legacy launchers; terminal-only publication.
+/studio/
+/src/doxa/desktop/
+/DOXA.spec
+/requirements-desktop.lock
+/scripts/build_desktop.ps1
+/scripts/desktop_entry.py
+/Open DOXA.cmd
+/Open DOXA Terminal.cmd
+/Open DOXA Terminal v14.cmd
+/docs/verification/studio.png
+/docs/verification/backend-stage.png
+/docs/verification/workbench-desktop.md

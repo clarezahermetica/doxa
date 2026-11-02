@@ -2,6 +2,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from decimal import Decimal
+from typing import cast
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request
@@ -14,8 +15,17 @@ from doxa.core.config import Settings
 from doxa.core.controller import CapabilityUnavailable, ConfigureRun, Controller, RunBundle
 from doxa.core.execution import ExecuteTask
 from doxa.core.memory_commands import ProposeMemory, TransitionMemory
-from doxa.core.models import Contract, Event, Memory, Record, Run, Verification
-from doxa.core.profiles import CouncilConfig
+from doxa.core.models import (
+    Claim,
+    Contract,
+    Event,
+    Memory,
+    Record,
+    Run,
+    SourceDocument,
+    Verification,
+)
+from doxa.core.profiles import AgentDefinition, CouncilConfig
 from doxa.core.readiness import InstallationReadiness, inspect_readiness
 from doxa.core.research_commands import Command
 from doxa.core.retrieval_commands import RetrievalQuery
@@ -58,6 +68,167 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"]
     )
     # No CORS: Vite proxies /api; unsolicited cross-origin JSON writes fail preflight.
+
+    from fastapi.responses import StreamingResponse
+    from starlette.middleware.base import RequestResponseEndpoint
+    from starlette.responses import Response
+
+    from doxa.core.workbench import (
+        DebateExecution,
+        DebateRuntime,
+        ImportDocument,
+        ImportSource,
+        NewAgent,
+        NewExperiment,
+        ReviseClaim,
+        add_agent,
+        create_experiment,
+        import_document,
+        import_source,
+        revise_claim,
+    )
+
+    @app.middleware("http")
+    async def local_origin(request: Request, call_next: RequestResponseEndpoint) -> Response:
+        # Browser requests from another origin cannot read or mutate local research state.
+        origin = request.headers.get("origin")
+        expected = str(request.base_url).rstrip("/")
+        allowed_origins = {expected}
+        if controller.settings.development_studio:
+            allowed_origins.add("http://127.0.0.1:5173")
+        if origin and origin not in allowed_origins:
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(status_code=403, content={"detail": "Cross-origin request refused"})
+        return await call_next(request)
+
+    from doxa.core.models import ToolAudit
+    from doxa.core.web_tools import ToolRequest, use_tool
+
+    @app.post("/api/workbench/runs/{run_id}/tools", response_model=ToolAudit)
+    async def web_tool(run_id: UUID, command: ToolRequest) -> ToolAudit:
+        return await use_tool(controller, run_id, command)
+
+    from doxa.core.text_research import ReviewCommand, ReviewWorkspace
+
+    @app.get("/api/workbench/runs/{run_id}/branches/{branch_id}", response_model=ReviewWorkspace)
+    def review_workspace(run_id: UUID, branch_id: UUID) -> ReviewWorkspace:
+        return controller.review_workspace(run_id, branch_id)
+
+    @app.post("/api/workbench/runs/{run_id}/branches/{branch_id}/commands", response_model=Event)
+    def review_command(run_id: UUID, branch_id: UUID, command: ReviewCommand) -> Event:
+        return controller.review_command(run_id, branch_id, command)
+
+    @app.post("/api/workbench/demo")
+    async def offline_demo() -> dict[str, str | int]:
+        from doxa.core.workbench_demo import demonstrate
+
+        return await demonstrate(controller)
+
+    @app.post("/api/workbench/agents", response_model=AgentDefinition)
+    def new_agent(command: NewAgent) -> AgentDefinition:
+        return add_agent(controller, command)
+
+    @app.post("/api/workbench/experiments", response_model=Run, status_code=201)
+    def new_experiment(command: NewExperiment) -> Run:
+        return create_experiment(controller, command)
+
+    @app.post("/api/workbench/runs/{run_id}/sources")
+    def ingest_source(run_id: UUID, command: ImportSource) -> SourceDocument:
+        return import_source(controller, run_id, command)
+
+    @app.post("/api/workbench/runs/{run_id}/documents", response_model=SourceDocument)
+    def ingest_document(run_id: UUID, command: ImportDocument) -> SourceDocument:
+        return import_document(controller, run_id, command)
+
+    @app.get("/api/workbench/runs/{run_id}/sources/{source_id}")
+    def source_content(run_id: UUID, source_id: UUID) -> dict[str, str]:
+        from doxa.storage.artifacts import ArtifactStore
+
+        source = controller.ledger.get(source_id)
+        if not isinstance(source, SourceDocument) or source.run_id != run_id:
+            raise KeyError("Source not found")
+        text = (
+            ArtifactStore(controller.settings.data_dir / "artifacts").get(source.content).decode()
+        )
+        return {"title": source.title, "text": text, "source": source.source}
+
+    @app.get("/api/workbench/runs/{run_id}/contexts/{manifest_id}")
+    def context_content(run_id: UUID, manifest_id: UUID) -> list[dict[str, str]]:
+        import json
+
+        from doxa.core.models import ContextManifest
+        from doxa.storage.artifacts import ArtifactStore
+
+        record = controller.ledger.get(manifest_id)
+        if not isinstance(record, ContextManifest) or record.run_id != run_id:
+            raise KeyError("Context not found")
+        return cast(
+            list[dict[str, str]],
+            json.loads(
+                ArtifactStore(controller.settings.data_dir / "artifacts").get(record.messages)
+            ),
+        )
+
+    @app.post("/api/workbench/runs/{run_id}/claims/revise")
+    def revise(run_id: UUID, command: ReviseClaim) -> Claim:
+        return revise_claim(controller, run_id, command)
+
+    @app.post("/api/workbench/runs/{run_id}/start", status_code=202)
+    async def start_debate(run_id: UUID, command: DebateExecution) -> dict[str, str]:
+        runtime = DebateRuntime(controller, run_id)
+        if run_id in tasks or runtime.run.status != "configured":
+            raise HTTPException(409, "Run already started")
+        if runtime.run.execution_kind == "live" and not (
+            command.authorize_paid and command.authorize_external
+        ):
+            raise PermissionError("Explicit paid and disclosure authorization required")
+        if (
+            runtime.experiment.task is None
+            or runtime.experiment.task.task_type != "research_debate"
+        ):
+            raise ValueError("Research-debate task required")
+        task = asyncio.create_task(runtime.execute_debate(command))
+        tasks[run_id] = task
+
+        def done(finished: asyncio.Task[RunBundle]) -> None:
+            tasks.pop(run_id, None)
+            if not finished.cancelled():
+                finished.exception()  # Failures are recorded; avoid unobserved task exceptions.
+
+        task.add_done_callback(done)
+        return {"run_id": str(run_id), "status": "accepted"}
+
+    @app.get("/api/runs/{run_id}/events")
+    async def events(
+        run_id: UUID, request: Request, after: str | None = None, follow: bool = True
+    ) -> StreamingResponse:
+        bundle = controller.inspect(run_id)
+        cursor = after or request.headers.get("last-event-id")
+        ids = [str(e.id) for e in bundle.events]
+        if cursor and cursor not in ids:
+            raise HTTPException(409, "Cursor is not in this run")
+        start = ids.index(cursor) + 1 if cursor else 0
+
+        async def committed_events() -> AsyncIterator[str]:
+            offset = start
+            while True:
+                current = controller.inspect(run_id)
+                for event in current.events[offset:]:
+                    yield f"id: {event.id}\nevent: ledger\ndata: {event.model_dump_json()}\n\n"
+                    offset += 1
+                if not follow or getattr(request.app.state, "closing", False):
+                    return
+                if await request.is_disconnected():
+                    return
+                yield ": heartbeat\n\n"
+                await asyncio.sleep(0.5)
+
+        return StreamingResponse(
+            committed_events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+        )
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

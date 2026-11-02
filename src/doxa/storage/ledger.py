@@ -52,14 +52,14 @@ class Ledger:
     def append_batch(self, events: tuple[Event, ...]) -> tuple[Event, ...]:
         """One serialized transaction for a consequential multi-event transition."""
         for event in events:
-            reject_secrets(event.model_dump_json())
+            reject_secrets(event.model_dump_json(), directory=self.path.parent)
         with connection(self.path) as db, db:
             db.execute("BEGIN IMMEDIATE")
             return tuple(self._append(event, db) for event in events)
 
     def _append(self, event: Event, db: sqlite3.Connection) -> Event:
         # Also protect callers composing ledger writes into a financial transaction.
-        reject_secrets(event.model_dump_json())
+        reject_secrets(event.model_dump_json(), directory=self.path.parent, database=db)
         existing = db.execute(
             "SELECT body FROM events WHERE idempotency_key=?", (event.idempotency_key,)
         ).fetchone()

@@ -1,6 +1,7 @@
 """Provider composition and offline readiness. No health probe or credential is returned."""
 
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from decimal import ROUND_CEILING, Decimal
 from typing import Literal
 
@@ -8,6 +9,25 @@ from doxa.core.models import Contract
 from doxa.core.profiles import CouncilConfig, ModelProfile
 from doxa.providers.contracts import Capabilities, ModelProvider, ModelRequest
 from doxa.providers.runpod import RunPodProvider, endpoint_url
+
+
+@dataclass(frozen=True)
+class AdapterRegistration:
+    factory: Callable[[ModelProfile, Mapping[str, str]], ModelProvider]
+    validate: Callable[[ModelProfile, Mapping[str, str]], None]
+    capabilities: Capabilities
+    enabled_env: str
+    allowance_env: str
+
+
+ADAPTERS: dict[str, AdapterRegistration] = {}
+
+
+def register_adapter(name: str, registration: AdapterRegistration) -> None:
+    """Trusted Python extension entry point; never load code named by ledger data."""
+    if name in {"runpod", "openai", "claude", "gemini", "openai_compatible"} or name in ADAPTERS:
+        raise ValueError("Adapter identity is already registered")
+    ADAPTERS[name] = registration
 
 
 class ProviderDescriptor(Contract):
@@ -38,24 +58,58 @@ class ConfigurationReport(Contract):
 
 
 def provider_environment(provider: str) -> tuple[str, str]:
+    if provider in ADAPTERS:
+        return ADAPTERS[provider].enabled_env, ADAPTERS[provider].allowance_env
     if provider == "runpod":
         return "DOXA_RUNPOD_ENABLED", "DOXA_RUNPOD_ALLOWANCE_USD"
     if provider == "openai_compatible":
         return "DOXA_OPENAI_COMPATIBLE_ENABLED", "DOXA_OPENAI_COMPATIBLE_ALLOWANCE_USD"
+    if provider in {"openai", "claude", "gemini"}:
+        return f"DOXA_{provider.upper()}_ENABLED", f"DOXA_{provider.upper()}_ALLOWANCE_USD"
     raise ValueError("No implemented adapter for provider type")
 
 
 def validate_profile(profile: ModelProfile, env: Mapping[str, str]) -> None:
+    if profile.local:
+        from urllib.parse import urlsplit
+
+        parsed = urlsplit(profile.base_url or "")
+        if parsed.hostname not in {"127.0.0.1", "::1", "localhost"} or parsed.scheme not in {
+            "http",
+            "https",
+        }:
+            raise ValueError("Unbilled local dispatch requires an explicit loopback origin")
+    if profile.runtime in ADAPTERS:
+        ADAPTERS[profile.runtime].validate(profile, env)
+        return
     endpoint_url(profile, env)
     if (
         profile.model_id.strip() in {"", "replace_me"}
         or profile.model_id != profile.model_id.strip()
     ):
         raise ValueError("Set an exact served model identifier")
+    if profile.runtime == "openai" and profile.temperature != 0:
+        raise ValueError("Native OpenAI adapter omits temperature; use the default profile value")
+    from doxa.providers.wire import validate_parameters
+
+    validate_parameters(profile)
     caps = profile.capabilities
-    if caps.structured_output == "native":
+    if caps.images == "available" or caps.embeddings == "available":
+        raise ValueError(
+            "This adapter only implements text; image and embedding requests are unavailable"
+        )
+    if caps.text_generation == "unavailable":
+        raise ValueError("Model is configured without text-generation support")
+    if caps.structured_output == "native" and not (
+        profile.request_protocol == "responses" or profile.runtime == "gemini"
+    ):
         raise ValueError("Native structured output is not implemented by this adapter")
-    if caps.tool_calling in {"native", "emulated"} or caps.streaming or caps.seed_control:
+    if (
+        caps.tool_calling == "emulated"
+        or (caps.tool_calling == "native" and profile.runtime == "runpod")
+        or caps.streaming
+        or caps.seed_control
+    ):
         raise ValueError("Tool calling, streaming and seed controls are not implemented")
     if caps.context_limit and profile.max_context_tokens > caps.context_limit:
         raise ValueError("Configured context limit exceeds declared model context")
@@ -64,7 +118,7 @@ def validate_profile(profile: ModelProfile, env: Mapping[str, str]) -> None:
 
 
 def spending_allowance(profile: ModelProfile, env: Mapping[str, str]) -> Decimal:
-    _, allowance_env = provider_environment(profile.provider)
+    _, allowance_env = provider_environment(profile.runtime)
     try:
         amount = Decimal(env.get(allowance_env, "0"))
         limit = Decimal(25 if profile.provider == "runpod" else 75)
@@ -80,9 +134,11 @@ def spending_allowance(profile: ModelProfile, env: Mapping[str, str]) -> Decimal
 
 
 def readiness(profile: ModelProfile, env: Mapping[str, str]) -> ProfileReadiness:
-    switch, _ = provider_environment(profile.provider)
-    enabled = profile.enabled and env.get(switch, "false").lower() == "true"
-    present = bool(env.get(profile.credential_env) not in {None, "", "replace_me"})
+    switch, _ = provider_environment(profile.runtime)
+    enabled = profile.enabled and (profile.local or env.get(switch, "false").lower() == "true")
+    present = profile.authentication == "none" or bool(
+        env.get(profile.credential_env) not in {None, "", "replace_me"}
+    )
     issues = []
     try:
         validate_profile(profile, env)
@@ -92,11 +148,16 @@ def readiness(profile: ModelProfile, env: Mapping[str, str]) -> ProfileReadiness
     if not present:
         issues.append("Credential is missing; set the referenced backend environment variable")
     try:
-        spending_allowance(profile, env)
+        if not profile.local:
+            spending_allowance(profile, env)
     except ValueError as exc:
         issues.append(str(exc))
-    warnings = ["Offline inspection only; remote availability and credit balance are unverified"]
-    if profile.pricing is None:
+    warnings = [
+        "Local endpoint, hardware and served weights are unverified"
+        if profile.local
+        else "Offline inspection only; remote availability and credit balance are unverified"
+    ]
+    if profile.pricing is None and not profile.local:
         warnings.append("Pricing is unknown; each paid command needs a complete cost upper bound")
     return ProfileReadiness(
         profile_id=profile.id,
@@ -175,12 +236,15 @@ class ProviderRegistry:
         return tuple(
             ProviderDescriptor(
                 provider=name,
-                implemented=name in {"runpod", "openai_compatible"},
+                implemented=name in {"runpod", "openai_compatible", "openai", "claude", "gemini"},
                 capabilities=implemented
-                if name in {"runpod", "openai_compatible"}
+                if name in {"runpod", "openai_compatible", "openai", "claude", "gemini"}
                 else Capabilities(),
             )
             for name in ("runpod", "openai_compatible", "openai", "gemini", "claude")
+        ) + tuple(
+            ProviderDescriptor(provider=name, implemented=True, capabilities=entry.capabilities)
+            for name, entry in sorted(ADAPTERS.items())
         )
 
     def create(
@@ -190,6 +254,8 @@ class ProviderRegistry:
         factory: Callable[[ModelProfile, Mapping[str, str]], ModelProvider] | None = None,
     ) -> ModelProvider:
         validate_profile(profile, env)
-        provider_environment(profile.provider)
+        provider_environment(profile.runtime)
+        if profile.runtime in ADAPTERS:
+            return ADAPTERS[profile.runtime].factory(profile, env)
         # The same tested HTTP wire adapter handles explicitly configured compatible URLs.
         return (factory or RunPodProvider)(profile, env)

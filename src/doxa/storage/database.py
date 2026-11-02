@@ -8,6 +8,17 @@ from alembic.config import Config
 from sqlalchemy.engine import URL
 
 
+def require_active_run(db: Connection, run_id: str) -> None:
+    import json
+
+    row = db.execute(
+        "SELECT body FROM records WHERE run_id=? AND kind='run_state' ORDER BY rowid DESC LIMIT 1",
+        (run_id,),
+    ).fetchone()
+    if row and json.loads(row[0])["status"] in {"cancelled", "failed", "completed"}:
+        raise ValueError("Run is terminal; no further inference may be dispatched")
+
+
 def migrate(path: Path, revision: str = "head") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     config = Config()
