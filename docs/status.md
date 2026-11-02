@@ -1,5 +1,12 @@
 # Proof-of-concept publication preparation — November 2, 2026
 
+CI compatibility follow-up: the original publication's Ubuntu jobs for Python 3.12 and
+3.14 stopped at mypy with four Windows-only `ctypes.windll` references, before running
+tests. Explicit platform guards now keep credential protection and Windows parser jobs
+unavailable outside Windows; parser handle types remain explicit across both branches.
+CI also checks the Windows platform types on Ubuntu. Local focused credential/document
+verification passes 24 tests; the corrected commit reruns the complete remote matrix.
+
 The owner's proof-of-concept update is terminal only. React Studio and native desktop
 source/build files are excluded from the published tree and retained locally; the
 graphical entry point and Studio CI job are removed. The CLI, existing Textual workbench,

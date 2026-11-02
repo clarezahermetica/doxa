@@ -16,6 +16,15 @@ from doxa.retrieval.persistent import PersistentSearch
 from doxa.storage.database import connection
 
 
+def test_windows_parser_job_refuses_non_windows_before_native_calls(monkeypatch):
+    from doxa.retrieval import documents
+
+    with monkeypatch.context() as platform:
+        platform.setattr(documents.sys, "platform", "linux")
+        with pytest.raises(OSError, match="require Windows"):
+            documents.WindowsParserJob(None)
+
+
 def test_fts_cache_reuses_rows_filters_principals_and_rebuilds(controller):
     a, b = uuid4(), uuid4()
     cache = PersistentSearch(controller.settings.database_path)

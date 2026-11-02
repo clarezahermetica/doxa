@@ -87,7 +87,12 @@ def parse_bytes(filename: str, data: bytes) -> ParsedDocument:
 class WindowsParserJob:
     """Enforced child-process memory/CPU caps and termination when the job closes."""
 
+    kernel: Any
+    handle: int
+
     def __init__(self, process: subprocess.Popen[bytes]):
+        if sys.platform != "win32":
+            raise OSError("Windows parser jobs require Windows")
         from ctypes import wintypes as w
 
         class Basic(ctypes.Structure):
@@ -145,7 +150,7 @@ class WindowsParserJob:
         ) or not kernel.AssignProcessToJobObject(handle, int(cast(Any, process)._handle)):
             kernel.CloseHandle(handle)
             raise RuntimeError("Cannot enforce parser limits")
-        self.kernel: Any = kernel
+        self.kernel = kernel
         self.handle = handle
 
     def close(self) -> None:

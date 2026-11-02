@@ -24,6 +24,16 @@ from doxa.core.workbench import (
 DUMMY = "pass4-fake-authentication-value-not-a-real-credential"
 
 
+@pytest.mark.parametrize("decrypt", [False, True])
+def test_os_credentials_refuse_non_windows_without_touching_native_apis(monkeypatch, decrypt):
+    from doxa.core import credential_store
+
+    with monkeypatch.context() as platform:
+        platform.setattr(credential_store.sys, "platform", "linux")
+        with pytest.raises(ValueError, match="requires Windows"):
+            credential_store._protect(b"synthetic-credential", decrypt=decrypt)
+
+
 def credential_file(controller):
     path = controller.settings.data_dir / ".env"
     path.write_text("CANONICAL_AUTH=" + DUMMY + "\n")

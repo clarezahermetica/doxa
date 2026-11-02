@@ -1,8 +1,8 @@
 """Windows current-user DPAPI store. No credential value enters a contract."""
 
 import ctypes
-import os
 import re
+import sys
 from pathlib import Path
 
 
@@ -11,7 +11,7 @@ class Blob(ctypes.Structure):
 
 
 def _protect(data: bytes, decrypt: bool = False) -> bytes:
-    if os.name != "nt":
+    if sys.platform != "win32":
         raise ValueError(
             "OS-backed credential entry currently requires Windows; use an environment reference"
         )

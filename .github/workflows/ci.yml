@@ -15,6 +15,7 @@ jobs:
       - run: pip install -e '.[dev]'
       - run: ruff check .
       - run: mypy
+      - run: mypy --platform win32
       - run: pytest
       - run: python scripts/export_contracts.py
       - run: git diff --exit-code docs/contracts
