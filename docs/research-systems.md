@@ -1,10 +1,10 @@
 # Research systems — implementation and reproduction
 
-This stage implements controller-owned research transitions on `cache-policy` v1.
+These sections describe controller-owned research transitions on `cache-policy` v1.
 It is a finite, built-in stateful environment, with real state changes and fixed
 independent read/update/delete tests. Inputs and demonstration annotations are
 explicitly synthetic. These are engineering checks, not model-performance results.
-The pre-change audit is [research-audit.md](research-audit.md).
+The general text-research workflow is covered in the [workbench guide](workbench.md).
 
 ## Reproduce the integrated experiment
 
@@ -17,8 +17,9 @@ From the repository root in PowerShell:
 .\.venv\Scripts\doxa.exe research-demo
 ```
 
-`research-demo` initializes/migrates the canonical `.doxa` ledger, then creates a
-new synthetic experiment there. It makes no provider, Moss, deployment or paid call.
+`research-demo` initializes/migrates the selected workspace, then creates a new synthetic
+experiment there. Select a dedicated test workspace first; it makes no provider, Moss,
+deployment or paid call.
 It prints the actual run, checkpoint, child IDs, evaluations and retrieval outcomes.
 Use those printed IDs below; do not replace them with invented records:
 
@@ -34,7 +35,7 @@ canonical events with nested records, artifact references, ancestry and provenan
 Neither is an artifact archive. Keep exports private. All commands and the HTTP
 `POST /api/runs/{run}/branches/{branch}/commands` route use `Controller.research_command`.
 `GET /api/runs/{run}/compare-branches?baseline=...&treatment=...` exposes persisted
-comparison data to the existing Studio/API inspector without adding a frontend design.
+comparison data through the optional loopback API.
 
 The demo records a known faulty policy/diagnosis, independently verifies failure,
 pins S0, mutates the parent's actual values to S1, and restores two independent
@@ -181,8 +182,10 @@ reviewer reference and judgment through the command API/CLI.
 Events: `EVALUATION_RECORDED`, `HUMAN_ANNOTATION_ADDED`. Tests: recovery/regression
 denominators and null billing, matched-run comparisons, annotations/export/reload,
 invalid pairwise targets/ratings, failed-vs-successful branch comparison.
-Limitations: no statistical inference, broad benchmark suite, actual human ratings,
-or complete artifact export archive. General costs are not inferred from token counts.
+Limitations: no statistical inference or broad empirical benchmark suite. Recorded fixture
+ratings are synthetic, not observed human judgments. General costs are not inferred from
+token counts. For an artifact archive, use the ZIP export described in the
+[offline exercise](canonical-research.md).
 
 ## Adaptive Reflection
 
@@ -225,6 +228,6 @@ execute. `DisabledSandbox` remains fail-closed. Required next port: an enforced
 container runner implementing `SandboxLimits` (no network/secrets, CPU/memory/time/
 filesystem quotas), its adversarial enforcement acceptance tests, and a task adapter
 that deploys patches and runs the locked repair oracle there. A filesystem snapshot
-or worktree alone is insufficient. This assignment deliberately adds no infrastructure.
+or worktree alone is insufficient.
 The finite-policy experiment therefore proves six-system domain interaction, not
 completion of the locked executable code-repair flagship or general DOXA release.

@@ -12,19 +12,18 @@ a workspace does not merge histories. `workspace-path`, the terminal notice and 
 | SQL schema revision | SQLite `alembic_version` | Additive migrations; transactional DDL. Use compatible readers. Old executables may reject newer record fields even with an unchanged SQL revision. |
 | Workspace selection / recents | `%LOCALAPPDATA%\DOXA\client.json` | Atomic settings file. Missing remembered paths remain errors; never silently replaced by an empty workspace. |
 | Startup help / saved guide position | `%LOCALAPPDATA%\DOXA\terminal.json` | Atomic settings file. Contains a checkbox and position, not research state or saved drafts. |
-| Theme | `%LOCALAPPDATA%\DOXA\appearance.json` | Source reliability fix: versioned per-user file, committed immediately on change with fsync/atomic replace. Independent of startup-help saves. |
+| Theme | `%LOCALAPPDATA%\DOXA\appearance.json` | Versioned per-user file, committed immediately on change with fsync/atomic replace. Independent of startup-help saves. |
 | Draft form fields, selected records, filters and open dialogs | Process memory | Not saved. Closing/canceling a form discards unsaved fields. There is no durable draft repository or autosave guarantee. |
 | Catalog descriptions | Workspace `model-catalog.json` | Descriptive metadata, atomically saved under a DB lock. ModelProfile versions in SQLite remain authoritative. |
-| Runtime enablement / spending allowances | Workspace `runtime-settings.json` | Source reliability fix: unique temporary file, flush/fsync and atomic replace; unrelated saved keys retained. Coordinate concurrent operators: independent read/modify/write updates are not a multi-writer merge protocol. |
+| Runtime enablement / spending allowances | Workspace `runtime-settings.json` | Unique temporary file, flush/fsync and atomic replace; unrelated saved keys retained. Coordinate concurrent operators: independent read/modify/write updates are not a multi-writer merge protocol. |
 | Credentials | Referenced environment / `.env`, or workspace `credentials/NAME.dpapi` | Backend-only resolution. Protected values never belong in the ledger. New DPAPI ciphertext is fully written/fsynced before exclusive publication; existing credentials cannot be replaced by save. |
 | Worker ownership | Workspace `worker-locks/*.lock` | OS-held lock. Filename can outlive a process; only the OS lock indicates ownership. A dead process releases it without replaying work. |
 | Worker logs | Workspace `worker-logs/` | Operational logs, not proof of model success, cancellation or billing. |
 | Local search | SQLite `search_documents`, `search_fts` | Derived FTS5 index. Canonical records and authorization still determine eligibility. |
-| Moss scoped session/cache | Workspace `retrieval-cache/<scope>/` | Derived, principal-scoped cache; cannot authorize memory or establish source truth. No live Moss request was made in this gate. |
+| Moss scoped session/cache | Workspace `retrieval-cache/<scope>/` | Derived, principal-scoped cache; cannot authorize memory or establish source truth. Live cache behavior remains unverified. |
 | Backup | New directory with `ledger.sqlite3`, `artifacts/`, `backup-manifest.json` | SQLite backup API includes committed WAL data; copied artifacts and restored snapshot are hash/integrity verified. Excludes secrets/preferences/runtime controls/caches. |
-| Research export | Explicit `.json`, legacy `.jsonl`, or `.zip` destination | New file only. Source JSON/JSONL fix flushes a temporary file before exclusive publication; ZIP includes pinned configurations and verified referenced artifacts. It is an inspection/export format, not a SQLite restore format. |
+| Research export | Explicit `.json`, legacy `.jsonl`, or `.zip` destination | New file only. JSON/JSONL flushes a temporary file before exclusive publication; ZIP includes pinned configurations and verified referenced artifacts. It is an inspection/export format, not a SQLite restore format. |
 | Packaged applications | Existing `dist/DOXA-Terminal-v*` and archives | Preserved installation artifacts, never experimental authority. Source fixes do not rewrite frozen applications. |
-| Retained graphical client | Studio form/navigation state is in memory; direct legacy desktop defaults to `%LOCALAPPDATA%\DOXA` | No localStorage/IndexedDB draft store was found in Studio source. The frozen desktop default differs from the terminal selector; pass the same explicit `--data-dir` to inspect the same ledger. No GUI source was changed. |
 
 ## Operational boundaries
 
@@ -43,5 +42,4 @@ a workspace does not merge histories. `workspace-path`, the terminal notice and 
 - No startup, viewer reconnect or restore is permission to perform inference, replay an uncertain
   request, release a reservation or invent a model result.
 
-The [pre-change audit inventory](verification/pass3-reliability-inventory.md) records the defects
-and transient-state findings before fixes. [Recovery](recovery.md) gives the exact operator steps.
+[Recovery](recovery.md) gives the operator steps for interruption and verified restoration.

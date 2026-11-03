@@ -43,7 +43,7 @@ exports/
 tmp/
 temp/
 
-# Desktop packaging output.
+# Packaging output.
 build/
 
 # Terminal workspace credentials and local runtime controls.

@@ -2,7 +2,7 @@
 
 This describes the current source implementation. A transport implementation and mocked
 contract test do not verify an account, credits, endpoint, exact model or provider-wide support.
-This reliability gate adds no provider/model and performs no real inference.
+Provider registration and mocked tests do not perform live acceptance.
 
 | Connection | Implemented pathway | Verification / limitations |
 | --- | --- | --- |
@@ -14,7 +14,7 @@ This reliability gate adds no provider/model and performs no real inference.
 | OpenRouter / Together / Fireworks / Groq | Compatible endpoint presets | No additional native adapter or service-wide certification. The chosen endpoint/model must accept the configured request format. |
 | Ollama / vLLM / LM Studio / SGLang | Explicit OpenAI-compatible server configuration | Native Ollama protocol and model loading are not implemented. No model server/weights are downloaded or launched automatically. |
 | Cohere / Bedrock / Vertex / Azure native / other unsupported catalog protocols | Descriptive registration only unless a separately installed trusted adapter exists | A catalog entry does not make an executable adapter or compatible model assignment. |
-| Moss | Optional research/memory retrieval service, not a language model | Existing fixtures/eligibility/cache boundaries. Historical uncertain $1 hold remains untouched; no new live retrieval accepted. |
+| Moss | Optional research/memory retrieval service, not a language model | Mocked eligibility/cache boundaries. Live retrieval and remote synchronization remain unverified. |
 
 Model IDs are open-ended; there is no model-family whitelist. Compatibility depends on declared
 capabilities, the adapter and the exact request. Native function requests are preserved at the
@@ -23,10 +23,10 @@ remain separately permission/authorization gated. Streaming, multimodal inferenc
 GGUF execution and unrestricted generated code remain unavailable.
 
 No automatic substitution, fixture fallback or replay is allowed for an uncertain paid call.
-Unknown usage/charges remain unknown. See [separate live acceptance](pass3-live-acceptance.md)
+Unknown usage/charges remain unknown. See [separate live acceptance](live-acceptance.md)
 for the named-provider/model/spend approval required before a real probe.
 
-## Pass 4 wire review (November 2, 2026)
+## Wire-level verification
 
 All combinations below are **mock verified only**, not live verified. Arbitrary saved
 profiles remain configured/unverified; catalog-only protocols remain registration only.
@@ -47,7 +47,7 @@ and reservations precede remote work; ambiguous outcomes retain holds. Native to
 cannot silently become completed research claims. Prompts and declared context limits do
 not establish actual context-window or structured-output compatibility for an unknown model.
 
-Official references checked for this pass:
+Protocol references consulted during implementation:
 
 - [OpenAI Chat request contract](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
 - [OpenAI Responses request contract](https://developers.openai.com/api/reference/cli/resources/responses/methods/create).
@@ -57,5 +57,5 @@ Official references checked for this pass:
 
 These documents explain protocol semantics; they are not evidence of a successful DOXA
 live call. Run the separately authorized acceptance procedure before promoting any exact
-adapter/model/settings combination to live verified. There are no live-verified combinations
-from Pass 4 and no observed failed live acceptances; the live gate is pending authorization.
+adapter/model/settings combination to live verified. These mocked checks do not establish
+any live-verified combination; the live gate requires separate authorization.

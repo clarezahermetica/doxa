@@ -1,195 +1,98 @@
-Terminal-only publication: React Studio and native desktop clients are retired and are
-excluded from this source snapshot. The existing Textual application, CLI, controller,
-local API and canonical ledger remain. Older GUI descriptions below are historical.
+# Architecture
 
-Pass 3 execution addendum: [model-backed research report](verification/pass3-model-execution.md)
-documents explicit native/compatible protocols, staged Council rounds, version-pinned context,
-launch authorization, conservative unknown outcomes and complete archive export. These extend
-the same controller/ledger. Mock-provider acceptance does not establish live model compatibility.
-GUI development remains frozen.
-
-Pass 1 storage/recovery addendum: [stabilization report](verification/pass1-stabilization.md)
-documents explicit workspace selection, transactional DDL upgrades, OS-held per-run worker
-ownership, conservative uncertain-call recovery, projection verification and verified
-non-overwriting backup/restore. These extend the same controller and canonical workspace
-ledger; they add no research database or alternate engine.
-
-Terminal-first direction: [terminal-first.md](terminal-first.md) describes the existing
-Textual client as primary, shared workspace selection, extensible model/runtime bindings,
-unbilled loopback dispatch, structured research proposals and credential isolation.
-Studio and desktop code are retained with active UI development frozen. Historical
-architecture descriptions follow; there is still one authoritative experimental ledger.
-
-Follow-up addendum: [workbench.md](workbench.md) documents branch-scoped human research
-operations, pinned text-history restores, persistent FTS5 migration 0003, isolated PDF/DOCX
-extraction, bounded structured tool follow-ups and principal-scoped local Moss snapshots.
-These remain controller-owned operations on the same ledger; none creates a second
-source of research truth. Historical architecture descriptions follow.
-
-Research-workbench addendum: [workbench.md](workbench.md) describes the text-only
-Council runtime, instance ancestry, source/context records, guarded native text
-providers, loopback SSE and desktop shell. All persist through the same controller
-and canonical ledger. [status.md](status.md) distinguishes verified preview scope
-from remaining release requirements. Historical architecture descriptions follow.
-
-Infrastructure addendum: [windows-setup.md](windows-setup.md) documents provider
-registry/readiness, safe response parsing, atomic operation+event commits, explicit
-recovery/reconciliation, the finite TaskEnvironment implementation and inspection UI.
-It supersedes historical infrastructure deferrals below. Research mechanisms are unchanged.
-
-Research stage addendum: [research-systems.md](research-systems.md) documents the
-controller command dispatcher, pure branch/rule projections, atomic multi-event
-writes, manifested restores and annotations now implemented. Its precise scope
-supersedes historical future-work statements below. No second database exists.
-
-# Modular monolith architecture
-
-October 24 implementation notes: [backend-stage guide](backend-stage.md) describes the
-bounded runtime now implemented atop these contracts. Existing foundation data remains
-readable; additive migration 0002 adds configuration history and operation metadata.
-
-DOXA is a modular monolith. One Python process owns application orchestration and one
-local SQLite database owns experimental history. Model and task adapters are ports;
-the Studio does not receive provider credentials or execute tools.
+DOXA is a local-first, terminal-first modular monolith. The Textual workbench, Typer
+CLI and optional loopback FastAPI service use the same deterministic controller and
+one authoritative SQLite ledger per workspace. Detached workers are additional local
+processes using that same workspace, not independent research engines.
 
 ```mermaid
 flowchart TD
-  CLI[Typer CLI] --> C[Deterministic controller]
-  UI[React Studio] --> API[Local FastAPI]
-  API --> C
-  C --> L[Append-only ledger and indexed records]
-  C -. future .-> S[Six research system ports]
-  C -. explicit opt in .-> P[Provider and retrieval adapters]
-  C --> E[Finite cache-policy environment and independent oracle]
-  C --> B[Persistent reservation and dispatch guard]
-  L --> DB[(SQLite with Alembic migrations)]
-  E -. future .-> SB[Restricted disposable sandbox]
-  L --- A[Content-addressed local artifacts]
+  T[Textual workbench] --> C[Controller]
+  CLI[Typer CLI] --> C
+  API[Loopback FastAPI] --> C
+  W[Detached worker] --> C
+  C --> L[SQLite ledger and configuration versions]
+  C --> A[Content-addressed artifacts]
+  C --> S[Research systems and finite task environment]
+  C --> B[Persistent reservations and dispatch guards]
+  C --> P[Opt-in model and retrieval adapters]
 ```
 
-Configuration performs no spending. Optional paid commands reserve and admit dispatch
-before calling an external service; no paid operation was performed during the research-system implementation. An earlier
-separately authorized Moss JavaScript lookup timed out; its bill remains unknown.
-Artifacts are a separate working storage primitive; the ledger carries their references.
+## Modules
 
-## Dependency rules
+| Location | Responsibility |
+| --- | --- |
+| `src/doxa/core/` | Contracts, validated commands, scheduling, context, authorization and orchestration. |
+| `src/doxa/storage/` | SQLite, additive migrations, artifacts, backups, integrity and worker ownership. |
+| `src/doxa/systems/` | Research projections and deterministic transition rules. |
+| `src/doxa/providers/` | Registered inference transports, request/response parsing and discovery boundaries. |
+| `src/doxa/retrieval/` | Source extraction, local indexes and optional Moss integration. |
+| `src/doxa/environments/` | Finite cache-policy task, independent verifier and disabled generated-code sandbox. |
+| `src/doxa/cli/`, `src/doxa/api/` | Clients of controller operations, not alternate business logic. |
+| `src/doxa/evaluation/`, `src/doxa/annotation/` | Explicit evaluation and annotation contracts. |
 
-`core.models` is the shared vocabulary and has no storage/provider/UI dependency.
-Ports depend on these contracts. Storage implements persistence over these contracts.
-The controller composes repositories and eventually system/adapter implementations.
-API and CLI call the controller; Studio calls HTTP. No service split, event broker,
-background queue, hosted backend, training framework, or hidden subsystem database.
-Configuration and dependency composition are explicit; imports do not create databases.
+## Identity and history
 
-## Identity and record semantics
+Experiments pin task, Council, model, instruction and resource configurations. A run is
+an attempt; a trajectory is a branch. Templates and model profiles have immutable
+versions, and run participants have their own identities. Multiple participants can
+share a role, model or credential without becoming independent sources of evidence.
 
-An Experiment is a versioned task/policy/model/budget configuration. A Run is one
-configured attempt under one of four protocols. A Trajectory is a branch within a Run.
-The explicit Experiment/Run split refines the design lock's shorthand “experiment/run”
-so comparative attempts can share immutable experimental configuration. Root branches
-have no ancestry; children pin a parent and fork event or checkpoint.
+Typed events contain scoped immutable records, causal links, provenance and per-trajectory
+sequences. Revisions append versions rather than replacing claims. Forks inherit only
+the ancestor prefix pinned by their checkpoint. Human annotations, model judgments,
+imported sources and independent verification remain distinguishable.
 
-Every domain record has a UUID and schema version. Claims, memories and decisions are
-immutable versions; future state changes must create new records and events rather
-than update old rows. `revises_id` links claim/memory versions. Status fields describe
-that version, not an in-place mutable aggregate. Run inspection projects lifecycle status
-from validated RunState events; memory retrieval resolves latest immutable versions.
+SQLite transactions serialize sequence allocation and commit related events/records
+atomically. Stable idempotency keys and request fingerprints reject conflicting retries.
+Immutable-history triggers protect application writes; they do not provide tamper
+resistance against an operator controlling the database or filesystem.
 
-Events have canonical uppercase enum names, UTC timestamps, stable IDs, experiment/run/
-trajectory scope, server-allocated per-trajectory sequence, causal parents, actor role,
-model assignment, provenance, artifact references, typed record payload, and a unique
-idempotency key. `payload` is a discriminated record union, never arbitrary provider JSON.
+Artifacts use content-addressed SHA-256 paths and verified reads. Migrations retain
+historical records. Integrity checks reconstruct indexed records from event payloads;
+backups and restoration verify history and artifact hashes without merging workspaces.
+See [storage](storage-map.md) and [recovery](recovery.md).
 
-The original draft uppercase names remain canonical. The design lock's conceptual
-“fork” maps to BRANCH_CREATED, “restore” to CHECKPOINT_RESTORED, “revision” to
-CLAIM_REVISED, “verification” to VERIFICATION_RECORDED, and “run close” to RUN_CLOSED.
-Added RUN_CREATED distinguishes configuration from EXPERIMENT_STARTED; added
-REFLECTION_SKIPPED, ADJUDICATION_RECORDED and PROVIDER_FAILED capture missing semantics.
-No second event naming scheme is emitted. These are contract vocabulary, not implemented handlers.
+## Execution and model boundaries
 
-## Atomicity, idempotency and recovery
+Council protocols schedule bounded sequential or parallel turns. The controller applies
+agent visibility, evidence and memory eligibility before assembling persisted contexts.
+Call, concurrency, round, timeout, token-admission and spending limits remain explicit.
+Conservative UTF-8 context bounds are not measured tokenizer usage; unknown usage or
+billing remains null.
 
-Alembic revision 0001 creates events, immutable indexed record versions, and reservation
-tables. SQLite triggers reject UPDATE and DELETE of history. BEGIN IMMEDIATE serializes
-sequence allocation and writes the event and linked records in one transaction. A failed
-record insert rolls back the event. Deduplication keys return an existing semantically
-identical event; changed content is rejected. Timestamps/allocated event IDs/sequences
-do not change command identity. No arbitrary event-write endpoint is exposed.
+The provider registry accepts arbitrary model IDs through compatible trusted adapters.
+Native transports and OpenAI-compatible endpoints are documented in
+[provider support](provider-support.md). Registration, saving a profile and local
+readiness inspection do not establish that a connection works. Paid inference and
+external disclosure require separate authorization and durable admission before dispatch.
+Uncertain external requests are not automatically replayed or refunded.
 
-The record index stores event-owned snapshots and can be reconstructed conceptually
-from event payloads; a rebuild command is deferred. Foreign keys and repository checks
-enforce primary event scope, ancestry and existing causal-parent membership. Typed
-claim/evidence/verification/memory references, promotion gates, supersession, terminal
-revocation and run transitions are checked inside the write transaction. Broader
-domain transition families remain future work. Ledger is an internal repository.
+## Evidence and tools
 
-SQLite file integrity is a local application guarantee, not tamper resistance against
-someone who can replace the database or drop its triggers. Downgrades that erase history
-fail explicitly. Future forward migrations must preserve and test old event deserialization.
+Source bytes, extracted text and context manifests have separate provenance and hashes.
+PDF/DOCX extraction runs in a credential-filtered bounded subprocess. Local FTS5 indexes
+and Moss snapshots are derived caches: the controller and Memory Tribunal still decide
+eligibility. Research documents and agent memories have distinct trust rules.
 
-Artifacts use SHA-256 paths relative to an artifact root, durable temporary writes and
-atomic replacement; reads check path containment, content hash and size. The application
-must not permit untrusted users to write filesystem entries in that root. No garbage
-collector, checkpoint restoration, backup tool, or full export archive is implemented.
+Web access requires run and participant permissions, explicit disclosure authorization,
+quotas and an approved domain. Live fetches additionally require the runtime switch;
+public DNS pinning, TLS validation, deadlines and response bounds remain enforced.
+Retrieved text is untrusted research data, never executable terminal markup or authority
+to change permissions. Live search has no configured production adapter.
 
-## Council and protocol boundary
+The independent verifier is outside the LLM Council. Objective cache-policy checks do
+not make open-ended research conclusions objectively correct. The six research systems
+have finite exercised behaviors; see [research systems](research-systems.md).
 
-Stable agents have role, instructions/versioned assignment, permissions, accepted
-message contracts, and private/shared memory scope. Orchestration remains deterministic
-software. Council messages carry sender, target, visibility, linked IDs and run scope.
-Proposer/Defender/Adjudicator are future protocol phases, not extra primary Council roles.
+## Operational limits
 
-Solo Direct, Solo Deliberative, Collaborative Multi-agent and Adversarial Multi-agent
-have distinct bounded cache-policy flows in `core/execution.py`. They preserve the same
-enum and event contracts. The legacy execution request without a typed task remains
-HTTP 501. Synthetic answers are labeled imported fixture data, never real model output.
-Live Solo Direct has mocked HTTP integration coverage; actual external calls remain
-separately authorized and untested. Participant reads allow only eligible memory and
-authorized Council messages. This is scoped context, not an authentication system; the
-loopback inspector/export is the trusted local operator's complete history view.
+Closing a viewer does not cancel its detached worker. Committed events support resumable
+inspection; worker ownership uses OS locks. Recovery retains ambiguous calls and held
+reservations until explicit reconciliation with evidence.
 
-## Research-system ports
-
-| System | Input → output | Dependencies and responsibility |
-| --- | --- | --- |
-| Epistemic Git | Context + claims / checkpoint pair → claim versions / diff | Claim/evidence records; immutable commitments and inspectable revisions. |
-| Counterfactual Engine | Context + checkpoint + declared intervention → child trajectory | Environment restore, verified manifests, budget guard; never rewrite parent. |
-| False Critic | Context + targeted challenge → typed verification | Independent verifier and evidence; no model consensus as validity. Controller authorizes revisions. |
-| Memory Tribunal | Candidate / validated transition / scope query → versioned memory / eligible set | Provenance, validation, source episode, private/shared scope, revocation; quarantine by default. |
-| Self-Correction Gym | Context + baseline run → evaluation | Versioned tasks, evaluator, resource accounting, lineage; retain failures and denominators. |
-| Adaptive Reflection | Context + trigger event → reason-coded decision | Observable evidence and policy/budget state; at most two interventions per branch. |
-
-All ports share SystemContext and common domain types. Bounded operations now live in
-the controller/runtime, comparison module, cache-policy environment and memory system.
-General implementations of every port method remain future work. Human annotations
-and preferences retain distinct contracts and provenance, separate from Gym correctness.
-
-## Adapter and execution boundary
-
-ModelProvider declares capabilities, typed request/response, cancellation and safe
-errors. Capability values default to unknown. Configurations reserve OpenAI, Gemini,
-OpenAI-compatible endpoints, and optional Claude without selecting models or prices.
-Adapters must validate structured output, preserve exact IDs/settings, opt into
-remote disclosure, resolve credentials locally, enforce timeout/call/context/retry limits,
-reserve known worst-case cost, record usage/errors, and bound retries. The optional
-RunPod implementation uses the OpenAI-compatible protocol; mocked tests cover its HTTP
-boundary. Moss is a separate optional retrieval adapter; its index cannot authorize
-memory. Other hosted providers still have contracts only.
-
-TaskEnvironment defines initialize, observe, act, snapshot, restore and terminate.
-The finite cache-policy prototype has a narrower concrete API with snapshots/restore
-and an independent oracle; it does not pretend to implement arbitrary tool execution.
-IndependentVerifier is a separate port; model criticism cannot impersonate it.
-SandboxLimits describes no-network, read-only-root, CPU/memory/time/write-space limits.
-DisabledSandbox is the only implementation. A future container runner must enforce
-these limits and strip credentials; filesystem copies or Git worktrees alone do not
-provide isolation. No generated task code runs on the host.
-
-## Persistence and API evolution
-
-Pydantic contracts generate domain JSON Schema and HTTP OpenAPI. Studio types are
-generated from OpenAPI. Future incompatible payloads need versioned readers and a
-migration/compatibility strategy; never reinterpret historical facts silently.
-The HTTP surface now includes versioned configuration, bounded execution/cancellation,
-memory commands/query, comparisons and accounting alongside run inspection/export.
-General standalone fork and annotation mutation endpoints remain deferred.
+The API binds to loopback and retains request validation. Credentials are resolved only
+in the backend through environment references or Windows DPAPI. No secrets or private
+workspaces belong in builds, exports or version control. Generated-code execution stays
+disabled until an enforced isolated runner and quotas exist. Studio and native desktop
+clients are retired from the published tree.

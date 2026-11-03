@@ -1,12 +1,12 @@
 # Separate live-provider acceptance
 
-No live inference was authorized or performed during Pass 3. Mock-provider tests establish
+Mock-provider tests establish
 serialization and controller behavior, not account access or exact-model compatibility.
 Use this procedure only after the operator names the provider, exact model and maximum spend.
-Do not retry the historical Moss operation or alter its reservation.
+Do not retry uncertain operations or alter their reservations automatically.
 
-1. Open the existing workspace with `doxa`. Keep the OneDrive synchronization precaution:
-   avoid simultaneous synchronized writers and keep a verified backup outside the sync root.
+1. Open the intended workspace with `doxa`. Avoid simultaneous synchronized writers;
+   keep a verified backup outside any synchronization root. Do not move history implicitly.
 2. Choose **Choose model and connection**. Select native OpenAI Responses, native OpenAI Chat,
    Anthropic Messages, Gemini generateContent, or an explicitly compatible endpoint. Enter the
    exact served model ID. Preserve existing credential references; saving never replaces keys.

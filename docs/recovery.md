@@ -45,8 +45,8 @@ recovery and keep uncertainty visible.
 For a local call, releasing its execution/concurrency hold requires explicit stopped-process
 attestation with evidence through `reconcile-local`. For a paid operation, settlement requires
 operator-supplied billing evidence and explicit reconciliation. A zero bill is not a default.
-Do not use the existing scalar `reconcile` command merely to clear a warning. The historical
-Moss operation has unknown billing and remains out of scope for automatic reconciliation.
+Do not use the existing scalar `reconcile` command merely to clear a warning. Unknown Moss
+or other provider charges require evidence; they are not automatically reconciled.
 
 ## Restore a workspace backup
 
