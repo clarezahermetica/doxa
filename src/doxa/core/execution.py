@@ -2,6 +2,7 @@
 
 import asyncio
 import hashlib
+import json
 import time
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -68,6 +69,8 @@ class ExecuteTask(Contract):
     fixture: CacheFixture = Field(default_factory=CacheFixture)
     synthetic_answers: dict[str, Candidate] = Field(default_factory=dict)
     authorize_paid: bool = False
+    authorize_quota: bool = False
+    authorize_external: bool = False
     upper_bound_usd_per_attempt: Decimal | None = Field(default=None, gt=0, le=25)
     authorized_allowances: dict[str, Decimal] = Field(default_factory=dict)
 
@@ -108,6 +111,7 @@ class Runtime:
         operation_id: UUID | None = None,
         outcome: str = "completed",
         billed_usd: Decimal | None = None,
+        quota_operation: bool = False,
     ) -> Event:
         previous = self.ledger.events(self.run.id)[-1]
         event = Event(
@@ -125,6 +129,8 @@ class Runtime:
             model=actor.model if actor else None,
         )
         if operation_id is not None:
+            if quota_operation:
+                return self.calls.complete_quota(operation_id, outcome, event, self.ledger)
             return self.calls.complete_call(operation_id, outcome, billed_usd, event, self.ledger)
         return self.ledger.append(event)
 
@@ -177,6 +183,8 @@ class Runtime:
         return Candidate.model_validate_json(await self.model_text(agent, phase, messages))
 
     async def model_text(self, agent: Agent, phase: str, messages: tuple[ModelMessage, ...]) -> str:
+        if self.run.execution_kind != "live":
+            raise PermissionError("Synthetic and replay runs cannot dispatch live inference")
         if not agent.permissions.remote_inference:
             raise PermissionError("Agent inference permission required")
         if not agent.model_profile_id or not agent.model:
@@ -185,7 +193,19 @@ class Runtime:
             "profile", agent.model_profile_id, agent.model_profile_version
         )
         assert isinstance(profile, ModelProfile)
-        env = workspace_env(self.controller.settings.data_dir)
+        env = (
+            {}
+            if profile.transport == "cli_session"
+            else workspace_env(self.controller.settings.data_dir)
+        )
+        if profile.transport == "cli_session":
+            if not (self.command.authorize_quota and self.command.authorize_external):
+                raise PermissionError(
+                    "CLI inference requires quota and external disclosure authorization"
+                )
+            if not profile.enabled:
+                raise PermissionError("CLI profile is disabled")
+            return await self.local_model_text(agent, phase, messages, profile, env, quota=True)
         if profile.local:
             return await self.local_model_text(agent, phase, messages, profile, env)
         if not self.command.authorize_paid:
@@ -281,6 +301,7 @@ class Runtime:
         messages: tuple[ModelMessage, ...],
         profile: ModelProfile,
         env: dict[str, str],
+        quota: bool = False,
     ) -> str:
         from doxa.storage.local_dispatch import admit_local
 
@@ -298,9 +319,16 @@ class Runtime:
             max_output_tokens=min(
                 profile.max_output_tokens, self.experiment.budget.max_output_tokens
             ),
-            timeout_seconds=profile.timeout_seconds,
+            timeout_seconds=min(profile.timeout_seconds, self.experiment.budget.timeout_seconds),
+            response_schema=self.cli_response_schema(profile) if quota else None,
         )
         provider.validate_request(request)
+        size = sum(len(m.content.encode()) + 32 for m in request.messages)
+        size += len(json.dumps(request.response_schema or {}).encode())
+        if size + request.max_output_tokens > min(
+            profile.max_context_tokens, self.experiment.budget.max_context_tokens
+        ):
+            raise ValueError("Context/output budget exceeded")
         record = ModelCall.model_validate(
             dict(
                 **self.scope(),
@@ -309,13 +337,14 @@ class Runtime:
                 agent_id=agent.id,
                 assignment=agent.model,
                 status="started",
-                billing_uncertain=False,
+                billing_uncertain=quota,
+                accounting_basis="subscription_quota" if quota else "local_unbilled",
                 request_hash=hashlib.sha256(request.model_dump_json().encode()).hexdigest(),
                 request_settings={
                     "profile_id": profile.id,
                     "profile_version": profile.version,
                     "adapter": profile.runtime,
-                    "location": "loopback",
+                    "location": "cli_session" if quota else "loopback",
                 },
             )
         )
@@ -336,7 +365,11 @@ class Runtime:
             idempotency_key=f"{self.run.id}:{phase}:local-start",
         )
         admit_local(
-            self.ledger, admitted, profile.concurrency, self.experiment.budget.max_model_calls
+            self.ledger,
+            admitted,
+            profile.concurrency,
+            self.experiment.budget.max_model_calls,
+            quota=quota,
         )
         try:
             response = await provider.generate(request)
@@ -348,9 +381,25 @@ class Runtime:
                     "error_category": "local_interruption",
                 }
             )
-            self.emit(phase + ":local-uncertain", EventType.MODEL_CALL_RECORDED, (unknown,))
+            self.emit(
+                phase + ":local-uncertain",
+                EventType.MODEL_CALL_RECORDED,
+                (unknown,),
+                operation_id=call_id if quota else None,
+                outcome="uncertain",
+                quota_operation=quota,
+            )
             raise
-        self.record_response(response, agent, phase, 0, Decimal("0"), request, local=True)
+        self.record_response(
+            response,
+            agent,
+            phase,
+            0,
+            None if quota else Decimal("0"),
+            request,
+            local=True,
+            quota=quota,
+        )
         self.ensure_running()
         if response.error:
             raise ProviderCallFailed(response.error.category)
@@ -379,21 +428,38 @@ class Runtime:
             reservation_id=None if profile.local else call_id,
         )
 
+    def cli_response_schema(self, profile: ModelProfile) -> dict[str, Any] | None:
+        if (
+            self.experiment.task
+            and self.experiment.task.structured_actions
+            and profile.capabilities.structured_output == "native"
+        ):
+            from doxa.providers.cli_session import research_schema
+
+            return research_schema()
+        return None
+
     def record_response(
         self,
         response: ModelResponse,
         agent: Agent,
         phase: str,
         attempt: int,
-        upper: Decimal,
+        upper: Decimal | None,
         request: ModelRequest,
         local: bool = False,
+        quota: bool = False,
     ) -> None:
         # Check before artifact writes; a rejected response leaves dispatch accounting
         # unresolved rather than publishing a secret or inventing a billing outcome.
         reject_secrets(response.model_dump_json(), directory=self.controller.settings.data_dir)
         reject_secrets(request.model_dump_json(), directory=self.controller.settings.data_dir)
         assert agent.model is not None
+        uncertain = bool(response.error and response.error.billing_uncertain) or (
+            quota
+            and response.completion_state == "incomplete"
+            and response.finish_reason == "completion_unobserved"
+        )
         record = ModelCall.model_validate(
             dict(
                 **self.scope(),
@@ -401,6 +467,11 @@ class Runtime:
                 call_id=response.call_id,
                 agent_id=agent.id,
                 assignment=agent.model,
+                accounting_basis="subscription_quota"
+                if quota
+                else "local_unbilled"
+                if local
+                else "api_usd",
                 response_id=safe_text(response.response_id) if response.response_id else None,
                 reported_model_id=safe_text(response.reported_model_id)
                 if response.reported_model_id
@@ -408,14 +479,17 @@ class Runtime:
                 usage=response.usage.model_copy(
                     update={
                         "estimated_usd": None if local else upper,
+                        **({"billed_usd": None} if quota else {}),
                         "pricing_version": agent.model.pricing_version,
                     }
                 ),
                 error_category=response.error.category if response.error else None,
-                status=("uncertain" if response.error.billing_uncertain else "failed")
+                status="uncertain" if uncertain else "failed" if response.error else "completed",
+                billing_uncertain=True
+                if uncertain
+                else response.error.billing_uncertain
                 if response.error
-                else "completed",
-                billing_uncertain=response.error.billing_uncertain if response.error else None,
+                else None,
                 request_hash=hashlib.sha256(request.model_dump_json().encode()).hexdigest(),
                 request_settings={
                     "max_output_tokens": request.max_output_tokens,
@@ -457,10 +531,9 @@ class Runtime:
             records,
             agent,
             Provenance.MODEL_OUTPUT,
-            operation_id=None if local else response.call_id,
-            outcome="completed"
-            if response.error is None
-            else ("uncertain" if response.error.billing_uncertain else "failed"),
+            operation_id=None if local and not quota else response.call_id,
+            quota_operation=quota,
+            outcome="uncertain" if uncertain else "failed" if response.error else "completed",
             billed_usd=response.usage.billed_usd,
         )
 

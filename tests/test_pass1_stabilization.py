@@ -375,7 +375,10 @@ def test_local_response_after_cancellation_does_not_continue_execution(controlle
     )
     run = controller.configure_run(
         command.model_copy(
-            update={"experiment": command.experiment.model_copy(update={"agents": (actor,)})}
+            update={
+                "execution_kind": "live",
+                "experiment": command.experiment.model_copy(update={"agents": (actor,)}),
+            }
         )
     )
     previous = controller.inspect(run.id).events[-1]

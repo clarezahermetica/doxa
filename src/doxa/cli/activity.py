@@ -200,8 +200,11 @@ def operation_details(row: Operation, controller: Any) -> str:
                         "exact call assignment": record.assignment.model_dump(mode="json"),
                         "request settings": record.request_settings,
                         "billing uncertain": record.billing_uncertain,
+                        "accounting basis": record.accounting_basis,
                     }
                 )
+                if record.accounting_basis == "subscription_quota":
+                    lines.append("Subscription quota consumption unknown; USD billing unavailable.")
     return "\n".join(lines)
 
 

@@ -34,11 +34,23 @@ def run_preflight(
     run_id: UUID,
     json_output: bool = typer.Option(False, "--json"),
     data_dir: Path = DEFAULT_DATA_DIR,
+    check_clis: bool = typer.Option(
+        False, "--check-clis", help="Run safe local CLI version/login checks; never infer."
+    ),
 ) -> None:
     """Inspect pinned launch eligibility without network access or spending."""
     from doxa.core.preflight import format_preflight, preflight
 
-    report = preflight(instance(data_dir), run_id)
+    controller = instance(data_dir)
+    report = preflight(controller, run_id)
+    if check_clis:
+        from doxa.providers.cli_session import check_cli
+
+        for adapter in sorted(
+            {str(p["adapter"]) for p in report.participants if p.get("transport") == "cli_session"}
+        ):
+            asyncio.run(check_cli(adapter))
+        report = preflight(controller, run_id)
     typer.echo(report.model_dump_json(indent=2) if json_output else format_preflight(report))
 
 
@@ -119,6 +131,7 @@ def run_start(
     run_id: UUID,
     authorize_paid: bool = False,
     authorize_external: bool = False,
+    authorize_quota: bool = False,
     upper_bound: str | None = None,
     data_dir: Path = DEFAULT_DATA_DIR,
 ) -> None:
@@ -131,6 +144,7 @@ def run_start(
             DebateExecution(
                 authorize_paid=authorize_paid,
                 authorize_external=authorize_external,
+                authorize_quota=authorize_quota,
                 upper_bound_usd_per_attempt=Decimal(upper_bound) if upper_bound else None,
             )
         )

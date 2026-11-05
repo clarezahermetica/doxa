@@ -89,6 +89,8 @@ class ModelScreen(ClientModal[bool]):
             self.initial_connection = self.saved_note["connection"]
         if profile and profile.runtime == "openai" and profile.request_protocol == "responses":
             self.initial_connection = "openai_responses"
+        if profile and profile.transport == "cli_session":
+            self.initial_connection = profile.runtime
 
     def compose(self) -> ComposeResult:
         p = self.profile
@@ -105,9 +107,7 @@ class ModelScreen(ClientModal[bool]):
                     )
                     yield DataTable(id="catalog-list", cursor_type="row")
                     yield Label("", id="catalog-detail", markup=False)
-                    yield Label(
-                        "Exact model ID sent to the endpoint (editable; served names may differ)"
-                    )
+                    yield Label("Exact model ID, or cli-default to use an account CLI's default")
                     yield Input(value=p.model_id if p else "", id="model-id")
                     with Collapsible(
                         title="Model identity details (descriptive, not execution support)",
@@ -144,6 +144,11 @@ class ModelScreen(ClientModal[bool]):
                         id="protocol-label",
                     )
                     protocols = dict(PROTOCOLS)
+                    from doxa.providers.cli_session import CLI_NAMES
+
+                    protocols.update(
+                        {key: title + " account CLI" for key, (title, _) in CLI_NAMES.items()}
+                    )
                     for descriptor in self.controller.provider_catalog():
                         if descriptor.implemented and descriptor.provider not in protocols:
                             protocols[descriptor.provider] = (
@@ -158,6 +163,8 @@ class ModelScreen(ClientModal[bool]):
                         id="model-provider",
                     )
                     yield Label("", id="model-status", markup=False)
+                    yield Button("Check installed CLIs (no inference)", id="model-cli-check")
+                    yield Label("", id="model-cli-status", markup=False)
                     with Collapsible(
                         title="Deployment / connection notes (optional)", collapsed=True
                     ):
@@ -198,7 +205,8 @@ class ModelScreen(ClientModal[bool]):
                                 "re)"
                             )
                             yield Input(
-                                value=p.credential_env if p else "MODEL_API_KEY", id="model-env"
+                                value=(p.credential_env or "") if p else "MODEL_API_KEY",
+                                id="model-env",
                             )
                             with Collapsible(
                                 title="Add a new credential securely (optional)",
@@ -250,15 +258,26 @@ class ModelScreen(ClientModal[bool]):
                             id="model-omit-temperature",
                         )
                         yield Label(
-                            "Reasoning declaration: preserve, omit, Responses effort, "
+                            "Reasoning declaration: preserve, omit, CLI/Responses effort, "
                             "or Claude adaptive"
                         )
                         yield Select(
                             [
                                 (v, v)
-                                for v in ("preserve", "omit", "low", "medium", "high", "adaptive")
+                                for v in (
+                                    "preserve",
+                                    "omit",
+                                    "low",
+                                    "medium",
+                                    "high",
+                                    "xhigh",
+                                    "max",
+                                    "adaptive",
+                                )
                             ],
-                            value="preserve",
+                            value=str(p.reasoning.get("effort", "preserve"))
+                            if p and p.transport == "cli_session"
+                            else "preserve",
                             allow_blank=False,
                             id="model-reasoning",
                         )
@@ -312,13 +331,14 @@ class ModelScreen(ClientModal[bool]):
                             id="model-text-capability",
                         )
                         yield Label(
-                            "Structured output — prompted JSON only; native schema mode is unsu"
-                            "pported"
+                            "Structured output declaration — verify exact model "
+                            "and connection support"
                         )
                         yield Select(
                             [
                                 ("Unknown", "unknown"),
                                 ("Prompted JSON declared", "prompted"),
+                                ("Native schema declared", "native"),
                                 ("Unavailable", "unavailable"),
                             ],
                             value=p.capabilities.structured_output if p else "unknown",
@@ -431,6 +451,27 @@ class ModelScreen(ClientModal[bool]):
                 self.query_one("#model-url", Input).value = connection.base_url
                 self.query_one("#model-endpoint", Input).value = ""
         runtime = str(self.query_one("#model-provider", Select).value)
+        from doxa.providers.cli_session import CLI_NAMES
+
+        cli = runtime in CLI_NAMES
+        if cli:
+            if not self.input("model-id"):
+                self.query_one("#model-id", Input).value = "cli-default"
+            self.query_one("#model-secret", Input).value = ""
+            self.query_one("#model-concurrency", Input).value = "1"
+            self.query_one("#model-thinking-budget", Input).value = ""
+            self.query_one("#model-text-capability", Select).value = "available"
+            if self.query_one("#model-structured-capability", Select).value == "unknown":
+                self.query_one("#model-structured-capability", Select).value = "prompted"
+        self.query_one("#model-cli-check").display = cli
+        self.query_one("#model-cli-status").display = cli
+        self.query_one("#model-concurrency", Input).disabled = cli
+        for control in (
+            "#model-thinking-budget",
+            "#model-omit-temperature",
+            "#model-request-compatible",
+        ):
+            self.query_one(control).display = not cli
         implemented = runtime in {
             p.provider for p in self.controller.provider_catalog() if p.implemented
         }
@@ -439,11 +480,11 @@ class ModelScreen(ClientModal[bool]):
         self.query_one("#protocol-label").display = self.query_one("#model-provider").display
         self.query_one("#endpoint-fields").display = runtime == "runpod"
         self.query_one("#url-fields").display = compatible or key in {"custom", "azure", "vertex"}
-        self.query_one("#auth-fields").display = bool(connection)
+        self.query_one("#auth-fields").display = bool(connection) and not cli
         authenticated = self.query_one("#model-auth", Select).value != "none"
-        self.query_one("#credential-fields").display = authenticated
-        self.query_one("#model-secret").display = implemented
-        self.query_one("#secret-entry").display = implemented
+        self.query_one("#credential-fields").display = authenticated and not cli
+        self.query_one("#model-secret").display = implemented and not cli
+        self.query_one("#secret-entry").display = implemented and not cli
         self.query_one("#artifact-fields").display = (
             compatible
             and self.query_one("#model-local", Checkbox).value
@@ -453,13 +494,19 @@ class ModelScreen(ClientModal[bool]):
                 or self.selected_entry.developer in {"Other / Custom", "User registered"}
             )
         )
-        self.query_one("#temperature-fields").display = runtime != "openai" and (
-            self.query_one("#model-request-compatible", Checkbox).value or self.profile is not None
+        self.query_one("#temperature-fields").display = (
+            not cli
+            and runtime != "openai"
+            and (
+                self.query_one("#model-request-compatible", Checkbox).value
+                or self.profile is not None
+            )
         )
         self.query_one("#enable-fields").display = implemented
         remote = not self.query_one("#model-local", Checkbox).value
-        self.query_one("#model-allowance").display = implemented and remote
-        self.query_one("#allowance-label").display = implemented and remote
+        self.query_one("#model-allowance").display = implemented and remote and not cli
+        self.query_one("#allowance-label").display = implemented and remote and not cli
+        self.query_one("#model-save", Button).disabled = cli and not implemented
         self.query_one("#model-save", Button).label = (
             "Save profile" if implemented else "Register only"
         )
@@ -476,6 +523,17 @@ class ModelScreen(ClientModal[bool]):
             p.provider for p in self.controller.provider_catalog() if p.implemented
         }
         state = "Model selected. " if self.input("model-id") else "Enter an exact model ID. "
+        from doxa.providers.cli_session import CLI_NAMES, CLI_RETRY_WARNING, cli_status
+
+        if runtime in CLI_NAMES:
+            check = cli_status(runtime)
+            self.query_one("#model-status", Label).update(
+                f"{check.name}: {check.detail}. Version: {check.version or 'unverified'}. "
+                f"Authentication: {check.authentication}. Subscription quota use requires "
+                "separate launch acknowledgment; USD billing unavailable, not zero. "
+                + CLI_RETRY_WARNING
+            )
+            return
         if key not in CONNECTION_BY_ID:
             state += "Choose a connection method."
         elif not implemented:
@@ -531,6 +589,22 @@ class ModelScreen(ClientModal[bool]):
             self.show_page()
         elif event.button.id == "model-save":
             await self.save()
+        elif event.button.id == "model-cli-check":
+            from doxa.providers.cli_session import check_installed_clis
+
+            event.button.disabled = True
+            try:
+                checks = await check_installed_clis()
+                self.query_one("#model-cli-status", Label).update(
+                    "\n".join(
+                        f"{c.name}: {c.detail}; version {c.version or 'unknown'}; "
+                        f"authentication {c.authentication}"
+                        for c in checks
+                    )
+                )
+                self.update_status()
+            finally:
+                event.button.disabled = False
 
     async def save(self) -> None:
         wrote_profile = False
@@ -602,6 +676,7 @@ class ModelScreen(ClientModal[bool]):
             if (
                 enabled
                 and changed_request
+                and runtime != "codex_cli"
                 and not self.query_one("#model-request-compatible", Checkbox).value
             ):
                 raise ValueError(
@@ -649,12 +724,36 @@ class ModelScreen(ClientModal[bool]):
                     self.query_one("#model-structured-capability", Select).value
                 ),
             }
+            if key == "codex_cli":
+                values.update(
+                    transport="cli_session",
+                    authentication="cli_session",
+                    credential_env=None,
+                    base_url=None,
+                    endpoint_id=None,
+                    local=False,
+                    retries=0,
+                    concurrency=1,
+                    pricing=None,
+                    artifact=None,
+                    generation_parameters={},
+                    reasoning=(
+                        self.profile.reasoning
+                        if self.profile and self.profile.transport == "cli_session"
+                        else {}
+                    ),
+                    temperature=0,
+                )
+            else:
+                values["transport"] = "http"
             reasoning_choice = str(self.query_one("#model-reasoning", Select).value)
             if reasoning_choice == "omit":
                 values["reasoning"] = {}
-            elif reasoning_choice in {"low", "medium", "high"}:
-                if runtime != "openai" or values["request_protocol"] != "responses":
-                    raise ValueError("Reasoning effort requires OpenAI Responses")
+            elif reasoning_choice in {"low", "medium", "high", "xhigh", "max"}:
+                if runtime != "codex_cli" and (
+                    runtime != "openai" or values["request_protocol"] != "responses"
+                ):
+                    raise ValueError("Reasoning effort requires Codex CLI or OpenAI Responses")
                 values["reasoning"] = {"effort": reasoning_choice}
             elif reasoning_choice == "adaptive":
                 if runtime != "claude":
@@ -682,14 +781,15 @@ class ModelScreen(ClientModal[bool]):
             from doxa.providers.registry import validate_profile
 
             validate_profile(profile, workspace_env(self.controller.settings.data_dir))
-            if self.input("model-secret"):
+            if profile.transport != "cli_session" and self.input("model-secret"):
+                assert profile.credential_env is not None
                 save_credential(
                     self.controller.settings.data_dir,
                     profile.credential_env,
                     self.input("model-secret"),
                 )
                 self.query_one("#model-secret", Input).value = ""
-            if profile.enabled and not profile.local:
+            if profile.enabled and not profile.local and profile.transport != "cli_session":
                 configure_runtime_guard(
                     self.controller.settings.data_dir,
                     profile.runtime,

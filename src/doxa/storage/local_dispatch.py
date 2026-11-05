@@ -5,7 +5,9 @@ from doxa.storage.database import connection, require_active_run
 from doxa.storage.ledger import Ledger
 
 
-def admit_local(ledger: Ledger, event: Event, concurrency: int, max_calls: int) -> Event:
+def admit_local(
+    ledger: Ledger, event: Event, concurrency: int, max_calls: int, *, quota: bool = False
+) -> Event:
     requested = event.payload[0]
     assert isinstance(requested, ModelCall)
     with connection(ledger.path) as db, db:
@@ -36,4 +38,28 @@ def admit_local(ledger: Ledger, event: Event, concurrency: int, max_calls: int) 
         )
         if active >= concurrency:
             raise ValueError("Local runtime concurrency or interrupted-call guard reached")
+        if quota:
+            service = str(requested.request_settings["adapter"])
+            if db.execute(
+                "SELECT 1 FROM quota_operations WHERE service=? "
+                "AND state IN ('in_flight','uncertain')",
+                (service,),
+            ).fetchone():
+                raise ValueError("CLI account concurrency or uncertain-operation guard reached")
+            admitted = {str(c.call_id) for c in calls.values() if c.run_id == requested.run_id}
+            admitted.update(
+                r[0]
+                for r in db.execute(
+                    "SELECT id FROM reservations WHERE run_id=? UNION SELECT id FROM "
+                    "quota_operations WHERE run_id=?",
+                    (str(requested.run_id), str(requested.run_id)),
+                )
+            )
+            if len(admitted) >= max_calls:
+                raise ValueError("Model call admission limit reached")
+            db.execute(
+                "INSERT INTO quota_operations (id,run_id,service,request_hash,state) "
+                "VALUES (?,?,?,?,'in_flight')",
+                (str(requested.call_id), str(requested.run_id), service, requested.request_hash),
+            )
         return ledger._append(event, db)

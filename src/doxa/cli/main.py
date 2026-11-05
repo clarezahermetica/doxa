@@ -26,6 +26,22 @@ app = typer.Typer(
 )
 
 
+@app.command("model-clis")
+def model_clis(json_output: bool = typer.Option(False, "--json")) -> None:
+    """Check allowlisted CLI versions/login status locally; never infer, install or log in."""
+    from doxa.providers.cli_session import check_installed_clis
+
+    checks = asyncio.run(check_installed_clis())
+    if json_output:
+        typer.echo(json.dumps([c.model_dump(mode="json") for c in checks], indent=2))
+    else:
+        for item in checks:
+            typer.echo(
+                f"{item.name}: {item.detail}; version {item.version or 'unknown'}; "
+                f"authentication {item.authentication}"
+            )
+
+
 def read_contract[Model: BaseModel](model: type[Model], path: Path) -> Model:
     from doxa.core.secrets import reject_secrets
 

@@ -159,6 +159,7 @@ class ToolIntent(Contract):
 
 class DebateExecution(Contract):
     authorize_paid: bool = False
+    authorize_quota: bool = False
     authorize_external: bool = False
     upper_bound_usd_per_attempt: Decimal | None = Field(default=None, gt=0, le=25)
     synthetic_answers: dict[str, str] = Field(default_factory=dict)
@@ -258,7 +259,10 @@ def create_experiment(controller: "Controller", command: NewExperiment) -> Run:
                 model_id=profile.model_id,
                 instruction_version=definition.instruction_version,
                 settings={
-                    "temperature": None if profile.runtime == "openai" else profile.temperature,
+                    "temperature": None
+                    if profile.runtime == "openai" or profile.transport == "cli_session"
+                    else profile.temperature,
+                    "transport": profile.transport,
                     "profile_id": profile.id,
                     "profile_version": profile.version,
                     "adapter": profile.runtime,
@@ -558,14 +562,29 @@ class ContextAssembler:
 
         from doxa.retrieval.excerpts import evidence_excerpt
 
-        for doc in docs:
-            append(
+        # Preserve room for eligible memory/history and divide evidence space fairly.
+        remaining = max(0, min(limit, input_bytes) - len((system + user).encode()) - 192)
+        history_reserve = remaining // 3 if history or memories else 0
+        evidence_budget = max(0, remaining - history_reserve)
+        for index, doc in enumerate(docs):
+            share = max(0, evidence_budget // (len(docs) - index) - 128)
+            excerpt = evidence_excerpt(
+                r.controller.settings.database_path,
                 doc.id,
-                evidence_excerpt(
-                    r.controller.settings.database_path, doc.id, texts[doc.id], task.question
-                ),
-                source_ids,
+                texts[doc.id],
+                task.question,
+                max_bytes=share,
             )
+            before = len(user.encode())
+            if excerpt:
+                append(doc.id, excerpt, source_ids)
+            evidence_budget = max(0, evidence_budget - (len(user.encode()) - before))
+            if doc.id in source_ids and excerpt != texts[doc.id]:
+                omitted[str(doc.id)] = (
+                    "partial_source; located excerpts in messages; full artifact retained"
+                )
+            elif not excerpt:
+                omitted[str(doc.id)] = "context_byte_upper_bound"
         for memory in memories:
             append(memory.id, memory.text, memory_ids)
         for message in history:
@@ -599,6 +618,7 @@ class ContextAssembler:
                 profile_id=agent.model_profile_id,
                 profile_version=agent.model_profile_version,
                 task_version=task.version,
+                selection_strategy="budgeted_full_sources_or_located_excerpts_v2",
                 source_ids=tuple(source_ids),
                 memory_ids=tuple(memory_ids),
                 history_ids=tuple(history_ids),
@@ -737,7 +757,8 @@ class DebateRuntime(Runtime):
             if a.model_profile_id
         ]
         remote = len(profiles) != len(self.experiment.agents) or any(
-            isinstance(p, ModelProfile) and not p.local for p in profiles
+            isinstance(p, ModelProfile) and not p.local and p.transport != "cli_session"
+            for p in profiles
         )
         if (
             self.run.execution_kind == "live"
@@ -749,6 +770,18 @@ class DebateRuntime(Runtime):
             )
         if self.run.execution_kind == "live" and command.synthetic_answers:
             raise ValueError("Synthetic answers cannot enter live runs")
+        cli_profiles = [
+            p for p in profiles if isinstance(p, ModelProfile) and p.transport == "cli_session"
+        ]
+        if self.run.execution_kind == "live" and cli_profiles:
+            if not (command.authorize_external and command.authorize_quota):
+                raise PermissionError(
+                    "CLI inference requires quota and context disclosure authorization"
+                )
+            from doxa.providers.cli_session import check_cli
+
+            for adapter in sorted({p.runtime for p in cli_profiles}):
+                await check_cli(adapter)
         from doxa.core.preflight import authorize
 
         authorization = authorize(
@@ -757,6 +790,7 @@ class DebateRuntime(Runtime):
             paid=command.authorize_paid,
             external=command.authorize_external,
             upper_bound=command.upper_bound_usd_per_attempt,
+            quota=command.authorize_quota,
         )
         authorization_artifact = self.store.put(
             authorization.model_dump_json().encode(), "application/json"
@@ -774,6 +808,8 @@ class DebateRuntime(Runtime):
         )
         self.command = ExecuteTask(
             authorize_paid=command.authorize_paid,
+            authorize_external=command.authorize_external,
+            authorize_quota=command.authorize_quota,
             upper_bound_usd_per_attempt=command.upper_bound_usd_per_attempt,
             authorized_allowances={
                 k: Decimal(v) for k, v in authorization.profile_allowances_usd.items()

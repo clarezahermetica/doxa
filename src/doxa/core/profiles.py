@@ -29,6 +29,7 @@ class PricingMetadata(Contract):
 
 
 class ModelProfile(Contract):
+    transport: Literal["http", "cli_session"] = "http"
     request_protocol: Literal["default", "responses"] = "default"
     # Explicit, capability-declared wire parameters, never arbitrary HTTP fields.
     generation_parameters: dict[str, JsonValue] = Field(default_factory=dict)
@@ -39,13 +40,13 @@ class ModelProfile(Contract):
     provider: str = Field(pattern=r"^[a-z][a-z0-9_-]*$")
     adapter: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_-]*$")
     local: bool = False
-    authentication: Literal["bearer", "none"] = "bearer"
+    authentication: Literal["bearer", "none", "cli_session"] = "bearer"
     model_id: str = Field(min_length=1)
     repository_id: str | None = None
     artifact: ModelArtifact | None = None
     endpoint_id: str | None = None
     base_url: str | None = None
-    credential_env: str = Field(default="RUNPOD_API_KEY", pattern=r"^[A-Z][A-Z0-9_]*$")
+    credential_env: str | None = Field(default="RUNPOD_API_KEY", pattern=r"^[A-Z][A-Z0-9_]*$")
     enabled: bool = False
     capabilities: Capabilities = Field(default_factory=Capabilities)
     temperature: float = Field(default=0, ge=0, le=2)
@@ -56,6 +57,31 @@ class ModelProfile(Contract):
     retries: int = Field(default=0, ge=0, le=3)
     concurrency: int = Field(default=1, ge=1, le=8)
     pricing: PricingMetadata | None = None
+
+    @model_validator(mode="after")
+    def connection_kind(self) -> Self:
+        if self.transport == "cli_session":
+            if (
+                self.authentication != "cli_session"
+                or self.credential_env is not None
+                or self.local
+                or self.base_url
+                or self.endpoint_id
+                or self.pricing
+                or self.artifact
+                or self.retries
+                or self.concurrency != 1
+            ):
+                raise ValueError(
+                    "CLI sessions require session authentication, "
+                    "no API credential/URL/pricing/artifact, "
+                    "concurrency one and retries zero"
+                )
+        elif self.authentication == "cli_session" or (
+            self.authentication == "bearer" and self.credential_env is None
+        ):
+            raise ValueError("HTTP authentication requires the appropriate credential reference")
+        return self
 
     @property
     def runtime(self) -> str:

@@ -31,6 +31,11 @@ criticism, revisions, comparisons and an independently inspectable export. Follo
 [separate live acceptance](live-acceptance.md) only with a named provider/model and
 explicit spending/disclosure approval. Saving a profile is not connection verification.
 
+For an existing Codex account session, select **Local account CLIs / Codex CLI** in
+Connection setup. **Check installed CLIs** reports safe local readiness without inference.
+See [CLI setup](cli-providers.md) for the distinct quota acknowledgment and limits;
+this path uses no API credential or positive USD allowance.
+
 ## What a run records
 
 Every participant has an instance ID, template/instruction versions and a pinned model
@@ -56,6 +61,13 @@ Original bytes and extracted text have separate hashes and parser provenance. PD
 parsing has a 12-second wall timeout, 512 MiB memory and 6-second CPU limits through
 Windows Job Objects or Unix resource limits. Archive expansion and extracted text are
 bounded. OCR, embedded-object execution and layout fidelity are not provided.
+
+Uploading retains the complete original; it does not imply every call received it.
+Context assembly includes full authorized source text when its budget share permits.
+Otherwise it supplies multiple ranked excerpts with original character ranges and PDF
+page locations, records partial coverage in the context manifest, and retains the
+full source artifact. Eligible memory/history receive reserved context room. Inspect
+the persisted context messages to determine exactly which text an agent received.
 
 SQLite FTS5/BM25 and optional Moss snapshots search authorized material; they do not own
 experimental truth or memory trust. Moss cache reuse remains scoped by project, run and

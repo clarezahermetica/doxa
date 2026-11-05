@@ -4686,6 +4686,11 @@
             "title": "Authorize Paid",
             "default": false
           },
+          "authorize_quota": {
+            "type": "boolean",
+            "title": "Authorize Quota",
+            "default": false
+          },
           "authorize_external": {
             "type": "boolean",
             "title": "Authorize External",
@@ -5534,6 +5539,16 @@
           "authorize_paid": {
             "type": "boolean",
             "title": "Authorize Paid",
+            "default": false
+          },
+          "authorize_quota": {
+            "type": "boolean",
+            "title": "Authorize Quota",
+            "default": false
+          },
+          "authorize_external": {
+            "type": "boolean",
+            "title": "Authorize External",
             "default": false
           },
           "upper_bound_usd_per_attempt": {
@@ -6474,6 +6489,16 @@
           "provenance": {
             "$ref": "#/components/schemas/Provenance"
           },
+          "accounting_basis": {
+            "type": "string",
+            "enum": [
+              "api_usd",
+              "local_unbilled",
+              "subscription_quota"
+            ],
+            "title": "Accounting Basis",
+            "default": "api_usd"
+          },
           "kind": {
             "type": "string",
             "const": "model_call",
@@ -6631,6 +6656,7 @@
           "run_id",
           "trajectory_id",
           "provenance",
+          "accounting_basis",
           "kind",
           "call_id",
           "agent_id",
@@ -6658,6 +6684,15 @@
             "const": 1,
             "title": "Schema Version",
             "default": 1
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "http",
+              "cli_session"
+            ],
+            "title": "Transport",
+            "default": "http"
           },
           "request_protocol": {
             "type": "string",
@@ -6724,7 +6759,8 @@
             "type": "string",
             "enum": [
               "bearer",
-              "none"
+              "none",
+              "cli_session"
             ],
             "title": "Authentication",
             "default": "bearer"
@@ -6778,8 +6814,15 @@
             "title": "Base Url"
           },
           "credential_env": {
-            "type": "string",
-            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Credential Env",
             "default": "RUNPOD_API_KEY"
           },
@@ -6868,6 +6911,15 @@
             "title": "Schema Version",
             "default": 1
           },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "http",
+              "cli_session"
+            ],
+            "title": "Transport",
+            "default": "http"
+          },
           "request_protocol": {
             "type": "string",
             "enum": [
@@ -6933,7 +6985,8 @@
             "type": "string",
             "enum": [
               "bearer",
-              "none"
+              "none",
+              "cli_session"
             ],
             "title": "Authentication",
             "default": "bearer"
@@ -6987,8 +7040,15 @@
             "title": "Base Url"
           },
           "credential_env": {
-            "type": "string",
-            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Credential Env",
             "default": "RUNPOD_API_KEY"
           },
@@ -7064,6 +7124,7 @@
         "type": "object",
         "required": [
           "schema_version",
+          "transport",
           "request_protocol",
           "generation_parameters",
           "reasoning",
@@ -7558,7 +7619,14 @@
             "default": []
           },
           "credential_env": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Credential Env"
           },
           "credential_present": {

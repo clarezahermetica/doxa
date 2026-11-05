@@ -179,10 +179,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         runtime = DebateRuntime(controller, run_id)
         if run_id in tasks or runtime.run.status != "configured":
             raise HTTPException(409, "Run already started")
-        if runtime.run.execution_kind == "live" and not (
-            command.authorize_paid and command.authorize_external
-        ):
-            raise PermissionError("Explicit paid and disclosure authorization required")
+        if runtime.run.execution_kind == "live":
+            if not (
+                command.authorize_external and (command.authorize_paid or command.authorize_quota)
+            ):
+                raise PermissionError("Explicit inference and disclosure authorization required")
+            from doxa.core.preflight import authorize
+            from doxa.providers.cli_session import check_installed_clis
+
+            if command.authorize_quota:
+                await check_installed_clis()
+            authorize(
+                controller,
+                run_id,
+                paid=command.authorize_paid,
+                external=command.authorize_external,
+                upper_bound=command.upper_bound_usd_per_attempt,
+                quota=command.authorize_quota,
+            )
         if (
             runtime.experiment.task is None
             or runtime.experiment.task.task_type != "research_debate"

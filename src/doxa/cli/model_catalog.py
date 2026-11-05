@@ -112,7 +112,7 @@ class Connection:
     source: str = ""
 
 
-CONNECTIONS = (
+CONNECTIONS: tuple[Connection, ...] = (
     Connection(
         "openai_responses",
         "Native APIs / OpenAI Responses",
@@ -234,6 +234,21 @@ CONNECTIONS = (
         "openai_compatible",
         "openai_compatible",
     ),
+)
+CONNECTIONS += tuple(
+    Connection(
+        key,
+        "Local account CLIs / " + title,
+        key if key == "codex_cli" else None,
+        key,
+        credential="",
+    )
+    for key, title in (
+        ("codex_cli", "Codex CLI"),
+        ("claude_cli", "Claude Code"),
+        ("gemini_cli", "Gemini CLI"),
+        ("copilot_cli", "GitHub Copilot CLI"),
+    )
 )
 CONNECTION_BY_ID = {c.key: c for c in CONNECTIONS}
 PROTOCOLS = {

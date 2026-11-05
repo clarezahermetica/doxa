@@ -26,7 +26,7 @@ def test_foundation_revision_0001_history_survives_forward_upgrades(tmp_path, co
     ctrl.initialize()
     assert ctrl.inspect(run.id).events == (saved,)
     with connection(settings.database_path) as db:
-        assert db.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0003"
+        assert db.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0004"
         assert (
             db.execute("SELECT body FROM events WHERE id=?", (str(saved.id),)).fetchone()[0]
             == original

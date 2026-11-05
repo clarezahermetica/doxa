@@ -15,6 +15,8 @@ Provider registration and mocked tests do not perform live acceptance.
 | Ollama / vLLM / LM Studio / SGLang | Explicit OpenAI-compatible server configuration | Native Ollama protocol and model loading are not implemented. No model server/weights are downloaded or launched automatically. |
 | Cohere / Bedrock / Vertex / Azure native / other unsupported catalog protocols | Descriptive registration only unless a separately installed trusted adapter exists | A catalog entry does not make an executable adapter or compatible model assignment. |
 | Moss | Optional research/memory retrieval service, not a language model | Mocked eligibility/cache boundaries. Live retrieval and remote synchronization remain unverified. |
+| Codex CLI account session | Native executable, existing ChatGPT login, tool-disabled text request | Offline subprocess/controller/TUI coverage plus one observed live 0.160.0 smoke requesting gpt-6.1-sol, low effort (2026-11-04). Independent resolved model/effort absent from CLI events; quota and USD unknown. Future calls require separate quota/disclosure authorization. See [CLI providers](cli-providers.md). |
+| Claude Code / Gemini CLI / GitHub Copilot CLI | Detection and unsupported-state diagnostics only | No reviewed executable adapters; not usable for inference through these identities yet. |
 
 Model IDs are open-ended; there is no model-family whitelist. Compatibility depends on declared
 capabilities, the adapter and the exact request. Native function requests are preserved at the

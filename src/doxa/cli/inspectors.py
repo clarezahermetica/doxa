@@ -8,7 +8,7 @@ from textual.widgets import Button, Input, Label, TextArea
 
 from doxa.cli.navigation import ClientModal
 from doxa.core.controller import Controller
-from doxa.core.models import ArtifactRef
+from doxa.core.models import ArtifactRef, ModelCall
 from doxa.storage.artifacts import ArtifactStore
 
 
@@ -83,6 +83,8 @@ def describe_record(controller: Controller, record: Any) -> str:
     values = record.model_dump(mode="json")
     for name in (
         "adapter",
+        "transport",
+        "accounting_basis",
         "base_url",
         "local",
         "authentication",
@@ -114,6 +116,11 @@ def describe_record(controller: Controller, record: Any) -> str:
         "history_ids",
         "memory_ids",
         "input_token_upper_bound",
+        "error_category",
+        "billing_uncertain",
+        "completion_state",
+        "request_settings",
+        "usage",
     ):
         if values.get(name) is not None:
             lines.extend(readable_fields({name: values[name]}))
@@ -140,6 +147,34 @@ def describe_record(controller: Controller, record: Any) -> str:
                     .get(artifact)
                     .decode("utf-8")[:200000]
                 )
+    if (
+        isinstance(record, ModelCall)
+        and record.response_artifact
+        and record.accounting_basis == "subscription_quota"
+    ):
+        import json
+
+        response = json.loads(
+            ArtifactStore(controller.settings.data_dir / "artifacts").get(record.response_artifact)
+        )
+        details = response.get("raw_response") or {}
+        names = (
+            "diagnostic_code",
+            "stage",
+            "process_id",
+            "exit_code",
+            "cli_version",
+            "command_policy",
+            "requested_model_id",
+            "requested_reasoning_effort",
+            "native_retry_policy",
+            "doxa_retries",
+        )
+        lines.extend(
+            readable_fields({"CLI diagnostics": {k: details[k] for k in names if k in details}})
+        )
+        if not details:
+            lines.append("CLI startup diagnostics were not captured for this historical call.")
     return "\n".join(lines)
 
 

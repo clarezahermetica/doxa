@@ -38,6 +38,7 @@ class LaunchAuthorization(Contract):
     report: Preflight
     authorize_paid: bool
     authorize_external: bool
+    authorize_quota: bool = False
     upper_bound_usd_per_attempt: Decimal | None = Field(default=None, gt=0, le=25)
     profile_allowances_usd: dict[str, str]
     uncertain_outcome_policy: str = "retain_reservation_no_replay"
@@ -49,6 +50,8 @@ def preflight(controller: "Controller", run_id: UUID) -> Preflight:
     assert isinstance(experiment, Experiment)
     task = experiment.task
     blockers: list[str] = []
+    if bundle.run.execution_kind == "replay":
+        blockers.append("Replay records are inspection-only; live inference is unavailable")
     if not task or task.task_type != "research_debate":
         blockers.append("This launch path requires a research-debate task")
     if bundle.run.status != "configured":
@@ -58,6 +61,7 @@ def preflight(controller: "Controller", run_id: UUID) -> Preflight:
     env = workspace_env(controller.settings.data_dir)
     participants: list[dict[str, JsonValue]] = []
     remote = False
+    quota = False
     requests = 0
     rounds = 1 if bundle.run.mode.value == "solo_direct" else task.council.rounds if task else 0
     for actor in experiment.agents:
@@ -85,8 +89,21 @@ def preflight(controller: "Controller", run_id: UUID) -> Preflight:
                     credential_present=ready.credential_present,
                     status=ready.status,
                     issues=list(ready.issues),
-                    endpoint=endpoint_url(profile, env),
+                    endpoint=None
+                    if profile.transport == "cli_session"
+                    else endpoint_url(profile, env),
+                    transport=profile.transport,
+                    accounting_basis="subscription_quota"
+                    if profile.transport == "cli_session"
+                    else "local_unbilled"
+                    if profile.local
+                    else "api_usd",
                 )
+                if profile.transport == "cli_session":
+                    row["reasoning_effort"] = profile.reasoning.get("effort")
+                    row["reasoning_source"] = (
+                        "explicit_profile" if profile.reasoning else "CLI_default_unverified"
+                    )
                 if ready.status != "ready_for_authorized_test":
                     blockers.append(
                         actor.display_name + ": " + ("; ".join(ready.issues) or "disabled")
@@ -107,7 +124,8 @@ def preflight(controller: "Controller", run_id: UUID) -> Preflight:
                         actor.display_name + ": declare prompted structured-action support"
                     )
                 attempts += min(profile.retries, experiment.budget.max_retries)
-                remote |= not profile.local
+                quota |= profile.transport == "cli_session"
+                remote |= not profile.local and profile.transport != "cli_session"
             except (ValueError, KeyError):
                 blockers.append(actor.display_name + ": profile or endpoint is invalid/unavailable")
                 row["status"] = "unavailable"
@@ -121,6 +139,8 @@ def preflight(controller: "Controller", run_id: UUID) -> Preflight:
         if remote
         else ()
     )
+    if quota:
+        required = tuple(dict.fromkeys((*required, "authorize_external", "authorize_quota")))
     limits = experiment.budget.model_dump(mode="json")
     if task:
         limits["council"] = task.council.model_dump(mode="json")
@@ -152,14 +172,19 @@ def authorize(
     paid: bool,
     external: bool,
     upper_bound: Decimal | None,
+    quota: bool = False,
 ) -> LaunchAuthorization:
     report = preflight(controller, run_id)
     if not report.eligible:
         raise ValueError("Preflight blocked: " + "; ".join(report.blockers))
-    if report.authorization_required and not (paid and external and upper_bound):
+    if "authorize_paid" in report.authorization_required and not (
+        paid and external and upper_bound
+    ):
         raise PermissionError(
             "Remote research requires disclosure, paid authorization and a cost bound"
         )
+    if "authorize_quota" in report.authorization_required and not (quota and external):
+        raise PermissionError("CLI inference requires quota acknowledgment and context disclosure")
     env = workspace_env(controller.settings.data_dir)
     allowances = {}
     for row in report.participants:
@@ -177,6 +202,7 @@ def authorize(
         report=report,
         authorize_paid=paid,
         authorize_external=external,
+        authorize_quota=quota,
         upper_bound_usd_per_attempt=upper_bound,
         profile_allowances_usd=allowances,
     )
@@ -186,15 +212,35 @@ def format_preflight(report: Preflight) -> str:
     lines = [
         "Eligible for separately authorized launch" if report.eligible else "Launch blocked",
         f"{report.execution_kind} · {report.planned_rounds} rounds · "
-        f"at most {report.planned_requests_upper_bound} model requests including retries/tools",
-        "Run spending ceiling USD: " + str(report.limits.get("run_cap_usd", "unknown")),
+        f"at most {report.planned_requests_upper_bound} "
+        + (
+            "DOXA invocations including DOXA retries/tools"
+            if "authorize_quota" in report.authorization_required
+            else "model requests including retries/tools"
+        ),
     ]
+    if "authorize_quota" in report.authorization_required:
+        from doxa.providers.cli_session import CLI_RETRY_WARNING
+
+        lines.append("Subscription quota: consumption unknown; USD billing unavailable, not zero")
+        lines.append(CLI_RETRY_WARNING)
+    if "authorize_quota" not in report.authorization_required or (
+        "authorize_paid" in report.authorization_required
+    ):
+        lines.append(
+            "Run spending ceiling USD: " + str(report.limits.get("run_cap_usd", "unknown"))
+        )
     for row in report.participants:
         lines.append(
             f"{row.get('name')} · {row.get('role')} · "
             f"{row.get('profile_id')} v{row.get('profile_version')} · "
             f"{row.get('model_id', 'synthetic')} · {row.get('status', 'fixture')}"
         )
+        if row.get("transport") == "cli_session":
+            lines.append(
+                "Reasoning requested: "
+                + str(row.get("reasoning_effort") or "CLI default (unverified)")
+            )
     lines.extend("Blocked: " + text for text in report.blockers)
     lines.append(
         "Authorization: " + (", ".join(report.authorization_required) or "no paid API requested")

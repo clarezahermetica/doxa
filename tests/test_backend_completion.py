@@ -128,6 +128,7 @@ def test_registry_readiness_is_local_only_and_preserves_unknown_credit_balance()
         "openai",
         "claude",
         "gemini",
+        "codex_cli",
     }
     result = readiness(profile(), environment())
     assert result.status == "ready_for_authorized_test" and result.credit_balance_usd is None

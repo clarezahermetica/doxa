@@ -79,6 +79,12 @@ does not establish recoverability. Existing environment variables still apply af
 
 ## Corrupt settings or partial files
 
+CLI subscription calls use `quota_operations`, not dollar reservations. Recovery marks
+in-flight quota calls uncertain and retains the hold. It cannot establish whether a
+terminated client consumed account quota, and must not replay or automatically settle
+the call. The adapter remains blocked in that workspace pending evidence-based review;
+there is no quota-settlement shortcut in this version. See [CLI providers](cli-providers.md).
+
 - Theme load/save errors preserve the existing settings file. Preserve a private copy, then
   inspect or move that **specific appearance file** deliberately before selecting a new theme.
   No history or credentials need to be reset for an appearance problem.

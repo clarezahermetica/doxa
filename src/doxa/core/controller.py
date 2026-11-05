@@ -166,7 +166,7 @@ class Controller:
                         model_id=profile.model_id,
                         settings={
                             "temperature": None
-                            if profile.provider == "openai"
+                            if profile.provider == "openai" or profile.transport == "cli_session"
                             else profile.temperature
                         },
                         instruction_version=definition.instruction_version,

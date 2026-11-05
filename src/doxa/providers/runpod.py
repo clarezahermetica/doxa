@@ -126,7 +126,9 @@ class RunPodProvider:
             not self.profile.local and self.env.get(switch, "false").lower() != "true"
         ):
             raise ValueError("Provider disabled; explicitly enable the profile and provider switch")
-        if self.profile.authentication != "none" and self.env.get(self.profile.credential_env) in {
+        if self.profile.authentication != "none" and self.env.get(
+            self.profile.credential_env or ""
+        ) in {
             None,
             "",
             "replace_me",
@@ -174,7 +176,7 @@ class RunPodProvider:
             raise ValueError("Context cap exceeded")
 
     def redact(self, value: str) -> str:
-        values = [self.env.get(self.profile.credential_env, "")]
+        values = [self.env.get(self.profile.credential_env or "", "")]
         values.extend(
             secret
             for name, secret in self.env.items()
@@ -189,7 +191,7 @@ class RunPodProvider:
         uncertain = False
         try:
             self.validate_request(request)
-            key = self.env.get(self.profile.credential_env, "")
+            key = self.env.get(self.profile.credential_env or "", "")
             from doxa.providers.wire import normalize, serialize
 
             route, headers, body = serialize(self.profile, request, key)

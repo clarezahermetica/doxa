@@ -68,6 +68,12 @@ readiness inspection do not establish that a connection works. Paid inference an
 external disclosure require separate authorization and durable admission before dispatch.
 Uncertain external requests are not automatically replayed or refunded.
 
+Account CLIs use a distinct `cli_session` profile transport, existing provider contracts
+and the same controller. A trusted executable adapter runs without a shell in an empty
+temporary working directory; session references remain local. Subscription-quota admission
+is transactional in the canonical ledger, separate from dollar reservations; unknown
+consumption/cost stays null. See [CLI providers](cli-providers.md) for controls and limits.
+
 ## Evidence and tools
 
 Source bytes, extracted text and context manifests have separate provenance and hashes.

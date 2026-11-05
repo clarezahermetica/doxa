@@ -1762,6 +1762,16 @@
         "provenance": {
           "$ref": "#/$defs/Provenance"
         },
+        "accounting_basis": {
+          "default": "api_usd",
+          "enum": [
+            "api_usd",
+            "local_unbilled",
+            "subscription_quota"
+          ],
+          "title": "Accounting Basis",
+          "type": "string"
+        },
         "kind": {
           "const": "model_call",
           "default": "model_call",

@@ -14,7 +14,11 @@ class ConfigurationStore:
         reject_secrets(
             config.model_dump_json(),
             directory=self.path.parent,
-            credential_names=tuple(profile.credential_env for profile in config.profiles),
+            credential_names=tuple(
+                profile.credential_env
+                for profile in config.profiles
+                if profile.credential_env is not None
+            ),
         )
         with connection(self.path) as db, db:
             db.execute("BEGIN IMMEDIATE")

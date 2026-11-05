@@ -33,7 +33,7 @@ def validate_workspace(directory: Path) -> Path:
             if not {"events", "records", "reservations", "alembic_version"} <= tables:
                 raise ValueError("Selected database is not a DOXA workspace")
             revision = db.execute("SELECT version_num FROM alembic_version").fetchall()
-            if len(revision) != 1 or revision[0][0] not in {"0001", "0002", "0003"}:
+            if len(revision) != 1 or revision[0][0] not in {"0001", "0002", "0003", "0004"}:
                 raise ValueError(
                     "Unsupported DOXA workspace revision; use a compatible application"
                 )

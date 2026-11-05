@@ -29,6 +29,7 @@ def start_worker(
     *,
     authorize_paid: bool = False,
     authorize_external: bool = False,
+    authorize_quota: bool = False,
     upper_bound: str | None = None,
 ) -> subprocess.Popen[bytes]:
     run = controller.inspect(run_id).run
@@ -44,12 +45,15 @@ def start_worker(
         paid=authorize_paid,
         external=authorize_external,
         upper_bound=Decimal(upper_bound) if upper_bound else None,
+        quota=authorize_quota,
     )
     extra = []
     if authorize_paid:
         extra.append("--authorize-paid")
     if authorize_external:
         extra.append("--authorize-external")
+    if authorize_quota:
+        extra.append("--authorize-quota")
     if upper_bound:
         extra += ["--upper-bound", upper_bound]
     directory = controller.settings.data_dir / "worker-logs"
@@ -145,6 +149,9 @@ class StartScreen(ClientModal[bool]):
                 "Authorize disclosure of permitted context to remote endpoints", id="start-external"
             )
             yield Checkbox("Authorize paid inference within configured ceilings", id="start-paid")
+            yield Checkbox(
+                "Acknowledge CLI subscription quota use (consumption unknown)", id="start-quota"
+            )
             yield Input(placeholder="Complete remote per-attempt cost bound USD", id="start-bound")
             yield Label("", id="start-error")
             yield Button("Start experiment", id="start-save")
@@ -155,8 +162,25 @@ class StartScreen(ClientModal[bool]):
             self.query_one("#start-description", Label).update(
                 "Offline synthetic demonstration · no live model inference or paid calls."
             )
-            for identity in ("#start-external", "#start-paid", "#start-bound"):
+            for identity in ("#start-external", "#start-paid", "#start-bound", "#start-quota"):
                 self.query_one(identity).display = False
+        else:
+            from doxa.core.preflight import preflight
+
+            required = preflight(self.controller, self.run_id).authorization_required
+            self.query_one("#start-external").display = "authorize_external" in required
+            self.query_one("#start-quota").display = "authorize_quota" in required
+            for identity in ("#start-paid", "#start-bound"):
+                self.query_one(identity).display = "authorize_paid" in required
+            if "authorize_quota" in required:
+                from doxa.providers.cli_session import CLI_RETRY_WARNING
+
+                self.query_one("#start-description", Label).update(
+                    "CLI account subscription quota may be consumed. USD billing is unavailable; "
+                    "this is not zero-dollar inference. Authorize context disclosure separately."
+                    + " "
+                    + CLI_RETRY_WARNING
+                )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "start-close":
@@ -180,9 +204,11 @@ class StartScreen(ClientModal[bool]):
                     raise ValueError("Every live participant requires a model profile")
                 paid = self.query_one("#start-paid", Checkbox).value
                 external = self.query_one("#start-external", Checkbox).value
+                quota = self.query_one("#start-quota", Checkbox).value
                 bound = self.query_one("#start-bound", Input).value or None
                 if run.execution_kind == "live" and any(
-                    isinstance(p, ModelProfile) and not p.local for p in profiles
+                    isinstance(p, ModelProfile) and not p.local and p.transport != "cli_session"
+                    for p in profiles
                 ):
                     if not (paid and external and bound):
                         raise ValueError("Remote inference requires authorization and a cost bound")
@@ -191,6 +217,7 @@ class StartScreen(ClientModal[bool]):
                     self.run_id,
                     authorize_paid=paid,
                     authorize_external=external,
+                    authorize_quota=quota,
                     upper_bound=bound,
                 )
                 self.dismiss(True)

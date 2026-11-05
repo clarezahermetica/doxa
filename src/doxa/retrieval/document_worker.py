@@ -18,7 +18,8 @@ def main() -> None:
         raise ValueError("Document input too large")
     body = json.loads(raw)
     parsed = parse_bytes(body["filename"], base64.b64decode(body["data"], validate=True))
-    sys.stdout.write(parsed.model_dump_json())
+    # This is a JSON transport, independent of a Windows console's legacy encoding.
+    sys.stdout.buffer.write(parsed.model_dump_json().encode("utf-8"))
 
 
 if __name__ == "__main__":

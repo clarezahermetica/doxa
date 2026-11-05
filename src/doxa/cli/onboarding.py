@@ -255,7 +255,14 @@ class GettingStarted(ModalScreen[str | None]):
 
     def on_screen_resume(self) -> None:
         if self.is_mounted:
-            self.call_after_refresh(self.return_to_step)
+            focused = self.focused
+
+            def restore_focus() -> None:
+                # A queued resume must not steal a newer keyboard selection.
+                if self.app.screen is self and self.focused is focused:
+                    self.return_to_step()
+
+            self.call_after_refresh(restore_focus)
 
     def return_to_step(self) -> None:
         self.update_step()

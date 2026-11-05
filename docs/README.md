@@ -9,6 +9,7 @@ Start with the installation instructions in the repository [README](../README.md
 | [Architecture](architecture.md) | Controller, ledger, adapters and research boundaries. |
 | [Research systems](research-systems.md) | The six systems and their finite cache-policy checks. |
 | [Provider support](provider-support.md) | Implemented transports, mocked verification and unsupported capabilities. |
+| [Account CLI providers](cli-providers.md) | Codex session setup, quota acknowledgment, diagnostics and limitations. |
 | [Live acceptance](live-acceptance.md) | Separately authorized provider/model/spending checks. |
 | [Storage](storage-map.md) and [recovery](recovery.md) | Workspace paths, backups, interrupted calls and reservations. |
 | [Windows packaging](windows-installation.md) | Optional internal builds, installation and removal. |

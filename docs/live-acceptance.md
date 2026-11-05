@@ -5,6 +5,12 @@ serialization and controller behavior, not account access or exact-model compati
 Use this procedure only after the operator names the provider, exact model and maximum spend.
 Do not retry uncertain operations or alter their reservations automatically.
 
+The numbered procedure below is for HTTP/API billing. Account-session CLIs use
+[the CLI setup and quota procedure](cli-providers.md): explicitly approve subscription
+quota use and context disclosure instead of inventing an API key or dollar reservation.
+Safe local version/login checks precede that separate one-call authorization; they are
+not live-model acceptance. `cli-default` leaves the exact model unverified unless reported.
+
 1. Open the intended workspace with `doxa`. Avoid simultaneous synchronized writers;
    keep a verified backup outside any synchronization root. Do not move history implicitly.
 2. Choose **Choose model and connection**. Select native OpenAI Responses, native OpenAI Chat,

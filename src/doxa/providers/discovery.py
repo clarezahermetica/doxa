@@ -30,7 +30,7 @@ async def discover_models(
     url = endpoint_url(profile, env) + "/models"
     headers = {"Accept": "application/json", "Accept-Encoding": "identity"}
     if profile.authentication != "none":
-        key = env.get(profile.credential_env)
+        key = env.get(profile.credential_env or "")
         if not key:
             return ConnectionCheck(
                 status="not_configured", detail="Credential reference is missing"

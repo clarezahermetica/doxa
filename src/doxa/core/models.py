@@ -428,6 +428,7 @@ class TrajectoryState(ScopedRecord):
 
 
 class ModelCall(ScopedRecord):
+    accounting_basis: Literal["api_usd", "local_unbilled", "subscription_quota"] = "api_usd"
     kind: Literal["model_call"] = "model_call"
     call_id: UUID
     agent_id: UUID

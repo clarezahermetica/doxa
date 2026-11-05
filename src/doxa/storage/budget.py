@@ -106,6 +106,15 @@ class BudgetStore:
                     JOIN operations o ON r.id=o.id WHERE r.run_id=?""",
                     (str(run_id),),
                 ).fetchone()[0]
+                if db.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='quota_operations'"
+                ).fetchone():
+                    count = db.execute(
+                        "SELECT COUNT(*) FROM (SELECT r.id FROM reservations r "
+                        "JOIN operations o ON r.id=o.id WHERE r.run_id=? "
+                        "UNION SELECT id FROM quota_operations WHERE run_id=?)",
+                        (str(run_id), str(run_id)),
+                    ).fetchone()[0]
                 if max_calls is not None and count >= max_calls:
                     raise BudgetExceeded("Model/service call limit reached")
             db.execute(
@@ -196,8 +205,46 @@ class BudgetStore:
             rows = db.execute("""SELECT o.id,r.run_id,o.service,o.state,
                 r.reserved_microusd,r.billed_microusd FROM operations o
                 JOIN reservations r ON r.id=o.id ORDER BY o.rowid""").fetchall()
+            quota = (
+                db.execute(
+                    "SELECT id,run_id,service,state,reserved_calls,quota_consumed "
+                    "FROM quota_operations ORDER BY rowid"
+                ).fetchall()
+                if db.execute(
+                    "SELECT 1 FROM sqlite_master WHERE name='quota_operations'"
+                ).fetchone()
+                else []
+            )
         names = ("id", "run_id", "service", "state", "reserved_microusd", "billed_microusd")
-        return [dict(zip(names, row, strict=True)) for row in rows]
+        result = [dict(zip(names, row, strict=True)) for row in rows]
+        result.extend(
+            dict(
+                id=row[0],
+                run_id=row[1],
+                service=row[2],
+                state=row[3],
+                reserved_calls=row[4],
+                quota_consumed=row[5],
+                reserved_microusd=None,
+                billed_microusd=None,
+                accounting_basis="subscription_quota",
+            )
+            for row in quota
+        )
+        return result
+
+    def complete_quota(self, operation_id: UUID, state: str, event: Event, ledger: Ledger) -> Event:
+        if state not in {"completed", "failed", "uncertain"}:
+            raise ValueError("Invalid quota operation outcome")
+        with connection(self.path) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            prior = db.execute(
+                "SELECT state FROM quota_operations WHERE id=?", (str(operation_id),)
+            ).fetchone()
+            if prior is None or prior[0] not in {"in_flight", state}:
+                raise ValueError("Quota operation is unavailable or already finalized")
+            db.execute("UPDATE quota_operations SET state=? WHERE id=?", (state, str(operation_id)))
+            return ledger._append(event, db)
 
     def reconcile(
         self,
@@ -278,6 +325,11 @@ class BudgetStore:
                 db.execute("UPDATE operations SET state=? WHERE id=?", (outcome, identity))
                 previous = ledger._append(event, db)
 
+            db.execute(
+                "UPDATE quota_operations SET state='uncertain' "
+                "WHERE run_id=? AND state='in_flight'",
+                (str(run_id),),
+            )
             local: dict[UUID, ModelCall] = {}
             for row in db.execute(
                 "SELECT body FROM records WHERE run_id=? AND kind='model_call' ORDER BY rowid",
@@ -286,7 +338,10 @@ class BudgetStore:
                 call = ModelCall.model_validate_json(row[0])
                 local[call.call_id] = call
             for call in local.values():
-                if call.status != "started" or call.request_settings.get("location") != "loopback":
+                if call.status != "started" or call.request_settings.get("location") not in {
+                    "loopback",
+                    "cli_session",
+                }:
                     continue
                 uncertain = call.model_copy(
                     update={

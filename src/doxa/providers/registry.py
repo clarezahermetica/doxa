@@ -25,6 +25,10 @@ ADAPTERS: dict[str, AdapterRegistration] = {}
 
 def register_adapter(name: str, registration: AdapterRegistration) -> None:
     """Trusted Python extension entry point; never load code named by ledger data."""
+    from doxa.providers.cli_session import CLI_NAMES
+
+    if name in CLI_NAMES:
+        raise ValueError("Account CLI identities are reserved for reviewed executable adapters")
     if name in {"runpod", "openai", "claude", "gemini", "openai_compatible"} or name in ADAPTERS:
         raise ValueError("Adapter identity is already registered")
     ADAPTERS[name] = registration
@@ -44,7 +48,7 @@ class ProfileReadiness(Contract):
     status: Literal["disabled", "not_ready", "ready_for_authorized_test"]
     issues: tuple[str, ...]
     warnings: tuple[str, ...] = ()
-    credential_env: str
+    credential_env: str | None
     credential_present: bool
     # Presence is not verification that a key/endpoint works or credits remain.
     remote_verified: Literal[False] = False
@@ -70,6 +74,11 @@ def provider_environment(provider: str) -> tuple[str, str]:
 
 
 def validate_profile(profile: ModelProfile, env: Mapping[str, str]) -> None:
+    from doxa.providers.cli_session import CLI_NAMES, validate_cli_profile
+
+    if profile.transport == "cli_session" or profile.runtime in CLI_NAMES:
+        validate_cli_profile(profile)
+        return
     if profile.local:
         from urllib.parse import urlsplit
 
@@ -134,10 +143,41 @@ def spending_allowance(profile: ModelProfile, env: Mapping[str, str]) -> Decimal
 
 
 def readiness(profile: ModelProfile, env: Mapping[str, str]) -> ProfileReadiness:
+    if profile.transport == "cli_session":
+        from doxa.providers.cli_session import CLI_RETRY_WARNING, cli_status
+
+        check = cli_status(profile.runtime)
+        issues = []
+        try:
+            validate_profile(profile, env)
+        except ValueError as exc:
+            issues.append(str(exc))
+        if not check.ready:
+            issues.append(check.detail)
+        if profile.capabilities.structured_output == "native" and not check.schema_available:
+            issues.append("This installed CLI has not verified native response-schema support")
+        return ProfileReadiness(
+            profile_id=profile.id,
+            version=profile.version,
+            provider=profile.provider,
+            model_id=profile.model_id,
+            credential_env=None,
+            credential_present=check.authentication == "authenticated",
+            issues=tuple(issues),
+            warnings=(
+                "Subscription quota consumption unknown; USD billing unavailable, not zero",
+                CLI_RETRY_WARNING,
+            ),
+            status="disabled"
+            if not profile.enabled
+            else "not_ready"
+            if issues
+            else "ready_for_authorized_test",
+        )
     switch, _ = provider_environment(profile.runtime)
     enabled = profile.enabled and (profile.local or env.get(switch, "false").lower() == "true")
     present = profile.authentication == "none" or bool(
-        env.get(profile.credential_env) not in {None, "", "replace_me"}
+        env.get(profile.credential_env or "") not in {None, "", "replace_me"}
     )
     issues = []
     try:
@@ -227,24 +267,38 @@ def reservation_upper_bound(
 
 class ProviderRegistry:
     def descriptors(self) -> tuple[ProviderDescriptor, ...]:
+        from doxa.providers.cli_session import CLI_CAPABILITIES, CLI_NAMES
+
         implemented = Capabilities(
             structured_output="prompted",
             tool_calling="unavailable",
             usage_reporting=True,
             cancellation=True,
         )
-        return tuple(
-            ProviderDescriptor(
-                provider=name,
-                implemented=name in {"runpod", "openai_compatible", "openai", "claude", "gemini"},
-                capabilities=implemented
-                if name in {"runpod", "openai_compatible", "openai", "claude", "gemini"}
-                else Capabilities(),
+        return (
+            tuple(
+                ProviderDescriptor(
+                    provider=name,
+                    implemented=name
+                    in {"runpod", "openai_compatible", "openai", "claude", "gemini"},
+                    capabilities=implemented
+                    if name in {"runpod", "openai_compatible", "openai", "claude", "gemini"}
+                    else Capabilities(),
+                )
+                for name in ("runpod", "openai_compatible", "openai", "gemini", "claude")
             )
-            for name in ("runpod", "openai_compatible", "openai", "gemini", "claude")
-        ) + tuple(
-            ProviderDescriptor(provider=name, implemented=True, capabilities=entry.capabilities)
-            for name, entry in sorted(ADAPTERS.items())
+            + tuple(
+                ProviderDescriptor(
+                    provider=name,
+                    implemented=name == "codex_cli",
+                    capabilities=CLI_CAPABILITIES if name == "codex_cli" else Capabilities(),
+                )
+                for name in CLI_NAMES
+            )
+            + tuple(
+                ProviderDescriptor(provider=name, implemented=True, capabilities=entry.capabilities)
+                for name, entry in sorted(ADAPTERS.items())
+            )
         )
 
     def create(
@@ -254,6 +308,10 @@ class ProviderRegistry:
         factory: Callable[[ModelProfile, Mapping[str, str]], ModelProvider] | None = None,
     ) -> ModelProvider:
         validate_profile(profile, env)
+        if profile.transport == "cli_session":
+            from doxa.providers.cli_session import CLI_ADAPTERS
+
+            return CLI_ADAPTERS[profile.runtime](profile, env)
         provider_environment(profile.runtime)
         if profile.runtime in ADAPTERS:
             return ADAPTERS[profile.runtime].factory(profile, env)

@@ -75,7 +75,12 @@ def _credential_references(directory: Path, database: sqlite3.Connection | None 
         if not exists:  # Historical foundation workspaces have no profile table yet.
             return set()
         rows = db.execute("SELECT body FROM configurations WHERE kind='profile'").fetchall()
-        return {str(json.loads(row[0]).get("credential_env", "RUNPOD_API_KEY")) for row in rows}
+        return {
+            name
+            for row in rows
+            if isinstance(name := json.loads(row[0]).get("credential_env", "RUNPOD_API_KEY"), str)
+            and name
+        }
 
     try:
         if database is not None:
