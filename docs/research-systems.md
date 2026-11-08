@@ -221,7 +221,7 @@ skeptic, defender and adjudicator contexts. Live Deliberative requests all four
 phases. Historical synthetic fixtures with only three supplied answers remain
 supported; supplying `adjudicator` exercises the fourth phase. A deliberately wrong
 fourth-phase proposal fails independent checks, as tested. No live provider inference
-was performed in this task and no model assignment is fabricated for offline fixtures.
+is needed to reproduce these fixtures, and offline fixtures do not fabricate model assignments.
 
 **Incomplete release requirement:** generated cache-repair source code still cannot
 execute. `DisabledSandbox` remains fail-closed. Required next port: an enforced
@@ -231,3 +231,4 @@ that deploys patches and runs the locked repair oracle there. A filesystem snaps
 or worktree alone is insufficient.
 The finite-policy experiment therefore proves six-system domain interaction, not
 completion of the locked executable code-repair flagship or general DOXA release.
+

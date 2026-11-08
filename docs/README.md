@@ -1,40 +1,19 @@
 # Documentation
 
-Start with the installation instructions in the repository [README](../README.md).
+Start with [installation and launch](../README.md#installation), then run the
+[offline exercise](canonical-research.md) in a new workspace.
 
-| Guide | Purpose |
+| Guide | Use it to |
 | --- | --- |
-| [Workbench](workbench.md) | Terminal navigation, models, agents, experiments and evidence. |
-| [Offline research exercise](canonical-research.md) | A complete synthetic workflow and independently inspectable exports. |
-| [Architecture](architecture.md) | Controller, ledger, adapters and research boundaries. |
-| [Research systems](research-systems.md) | The six systems and their finite cache-policy checks. |
-| [Provider support](provider-support.md) | Implemented transports, mocked verification and unsupported capabilities. |
-| [Account CLI providers](cli-providers.md) | Codex session setup, quota acknowledgment, diagnostics and limitations. |
-| [Live acceptance](live-acceptance.md) | Separately authorized provider/model/spending checks. |
-| [Storage](storage-map.md) and [recovery](recovery.md) | Workspace paths, backups, interrupted calls and reservations. |
-| [Windows packaging](windows-installation.md) | Optional internal builds, installation and removal. |
-| [Status](status.md) | Observed verification and remaining limitations. |
-| [Design references](sources.md) | Original design provenance; not implementation acceptance. |
+| [Terminal workbench](workbench.md) | Create experiments, inspect exchanges, configure dispute review and interpret evaluations. |
+| [Offline exercise](canonical-research.md) | Follow a complete fixture workflow and independently inspect its exports. |
+| [Models and providers](providers.md) | Check supported connections, configure Codex/HTTP profiles and plan live connection tests. |
+| [Workspaces and recovery](workspaces.md) | Find stored data, back up, restore and inspect interrupted operations. |
+| [Architecture](architecture.md) | Understand the shared controller, ledger, adapters and original design references. |
+| [Six research systems](research-systems.md) | Inspect finite-cache behavior, reproduction commands and implementation limits. |
+| [Development and packaging](development.md) | Run development checks, select a source runtime and build internal Windows packages. |
+| [Current status](status.md) | See latest recorded verification, observed live execution and remaining limitations. |
 
-## Development checks
-
-From the repository root after creating the Python environment described in README:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install -e '.[dev]'
-.\.venv\Scripts\python.exe -m pytest
-.\.venv\Scripts\python.exe -m ruff check .
-.\.venv\Scripts\python.exe -m mypy --platform linux
-.\.venv\Scripts\python.exe -m mypy --platform win32
-.\.venv\Scripts\python.exe scripts/export_contracts.py
-git diff --exit-code docs/contracts
-```
-
-The public regression suite is used by GitHub CI and is not bundled in the installed
-application. It uses synthetic fixtures and mocked providers; passing tests do not
-establish live-provider compatibility or research quality. Actual credentials and
-research workspaces must remain private and outside the source tree.
-
-Earlier pass reports, copied specifications and retired GUI instructions remain in Git
-history. They are not current setup instructions. Current generated contracts are in
-[contracts](contracts/).
+The [development archive](archive/README.md) preserves earlier pass reports; their dated
+installation and testing statements are not current instructions. Generated API/record
+schemas are in [contracts](contracts/) and are checked by CI.
