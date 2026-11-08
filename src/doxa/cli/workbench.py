@@ -9,9 +9,11 @@ from uuid import UUID, uuid4
 
 import typer
 
+from doxa.cli.plain_text import terminal_text
 from doxa.core.config import Settings
 from doxa.core.controller import Controller
 from doxa.core.models import BudgetPolicy, CouncilLimits, Role, TaskSpecification
+from doxa.core.research_criteria import REVIEW_DISPUTES
 from doxa.core.workbench import (
     DebateExecution,
     DebateRuntime,
@@ -34,6 +36,9 @@ def run_preflight(
     run_id: UUID,
     json_output: bool = typer.Option(False, "--json"),
     data_dir: Path = DEFAULT_DATA_DIR,
+    full_cycle: bool = typer.Option(
+        False, "--full-cycle", help="Rehearse all turns offline in an isolated synthetic workspace."
+    ),
     check_clis: bool = typer.Option(
         False, "--check-clis", help="Run safe local CLI version/login checks; never infer."
     ),
@@ -51,6 +56,20 @@ def run_preflight(
         ):
             asyncio.run(check_cli(adapter))
         report = preflight(controller, run_id)
+    if full_cycle:
+        from doxa.core.cycle_preflight import cycle_preflight
+
+        cycle = cycle_preflight(controller, run_id)
+        if json_output:
+            typer.echo(
+                json.dumps({"readiness": report.model_dump(mode="json"), "cycle": cycle}, indent=2)
+            )
+        else:
+            typer.echo(format_preflight(report))
+            typer.echo("Offline full-cycle stress: " + ("passed" if cycle["passed"] else "failed"))
+            if cycle["error"]:
+                typer.echo(cycle["error"])
+        return
     typer.echo(report.model_dump_json(indent=2) if json_output else format_preflight(report))
 
 
@@ -96,9 +115,13 @@ def experiment_new(
     live: bool = False,
     structured: bool = False,
     staged: bool = False,
+    investigation: bool = False,
+    review_disputes: bool = False,
     data_dir: Path = DEFAULT_DATA_DIR,
 ) -> None:
     """Create an offline experiment with a question and configured Council templates."""
+    if review_disputes and not investigation:
+        raise typer.BadParameter("--review-disputes requires --investigation")
     controller = instance(data_dir)
     groups = []
     for value in member or []:
@@ -113,7 +136,10 @@ def experiment_new(
             name=name,
             task=TaskSpecification(
                 question=question,
-                structured_actions=structured,
+                research_protocol="investigation" if investigation else "fixed_rounds",
+                evaluation_criteria=("citation coverage", "explicit uncertainty")
+                + ((REVIEW_DISPUTES,) if review_disputes else ()),
+                structured_actions=structured or investigation,
                 staged_research=staged,
                 council=CouncilLimits(rounds=rounds),
             ),
@@ -124,6 +150,19 @@ def experiment_new(
         ),
     )
     typer.echo(f"Created {name} ({run.execution_kind}). Run: {run.id}")
+
+
+@experiment_app.command("control")
+def experiment_control(
+    reference_run: UUID, condition: str, data_dir: Path = DEFAULT_DATA_DIR
+) -> None:
+    """Prepare an unstarted solo, self_correction or multi_agent control; never infer."""
+    from doxa.core.controls import prepare_control
+
+    if condition not in {"solo", "self_correction", "multi_agent"}:
+        raise typer.BadParameter("Choose solo, self_correction or multi_agent")
+    run_id = prepare_control(instance(data_dir), reference_run, cast(Any, condition))
+    typer.echo(f"Prepared {condition} control; no inference. Run: {run_id}")
 
 
 @run_app.command("start")
@@ -238,7 +277,10 @@ def install(app: typer.Typer) -> None:
             typer.echo(json.dumps([p.model_dump(mode="json") for p in records]))
         else:
             for index, record in enumerate(records, 1):
-                typer.echo(f"{index}. {record.proposition} ({record.status}; {record.provenance})")
+                typer.echo(
+                    f"{index}. {terminal_text(record.proposition)} "
+                    f"({record.status}; {record.provenance})"
+                )
             if not records:
                 typer.echo("No claims recorded on this branch.")
 

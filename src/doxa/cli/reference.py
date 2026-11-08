@@ -38,6 +38,30 @@ class ActionSpec:
 
 ACTIONS = (
     ActionSpec(
+        "control",
+        "Prepare controlled experiment",
+        "Prepare an unstarted solo, self-correction or multi-agent control.",
+        "Evaluation and export",
+    ),
+    ActionSpec(
+        "runtime_info",
+        "Inspect runtime and launcher",
+        "Show the active build, executable, workspace and installed-launcher mismatch.",
+        "Workspace and maintenance",
+    ),
+    ActionSpec(
+        "exchanges",
+        "Read claim exchanges",
+        "Open linked claims, objections, responses, versions and source navigation.",
+        "Claims and revision",
+    ),
+    ActionSpec(
+        "replay",
+        "Replay saved activity",
+        "Read committed event history without starting a worker or model call.",
+        "Experiments and runs",
+    ),
+    ActionSpec(
         "details",
         "Expand record",
         "Expand a selected record; Ctrl+J retains exact JSON.",
@@ -475,6 +499,11 @@ class CommandReference(ModalScreen[str | None]):
             and query
             in (e.title + " " + e.category + " " + e.description + " " + e.detail).casefold()
         ]
+        if not query and category == "Common research tasks":
+            unique: dict[str, ReferenceEntry] = {}
+            for entry in self.matches:
+                unique.setdefault(entry.action or entry.title, entry)
+            self.matches = list(unique.values())[:20]
         table = self.query_one(DataTable)
         table.clear()
         for i, e in enumerate(self.matches):

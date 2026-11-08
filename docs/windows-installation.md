@@ -16,8 +16,9 @@ has `dev`, `packaging` and `moss` extras for the corresponding development tools
 migrations and the model catalog, and exclude tests, development tools and graphical clients.
 Node.js, a browser and a Vite server are not runtime requirements.
 
-Before a new internal build, choose a new shared terminal build identity in `src/doxa/version.py`
-and matching build-script version. Run the [development checks](README.md#development-checks),
+Before a new internal build, choose a new numeric terminal build identity in `src/doxa/version.py`.
+The build script derives its default from that identity and rejects conflicting versions.
+Run the [development checks](README.md#development-checks),
 then from the repository root:
 
 ```powershell

@@ -182,7 +182,9 @@ class CliFailure(ValueError):
 
 
 def research_schema() -> dict[str, Any]:
-    """A small syntax envelope; controller rules still authorize every proposed action."""
+    """Native output choices mirror controller contracts; authorization stays in the controller."""
+    from doxa.core.text_research import ReviewAssessment, ReviewDecision, ReviewResponse
+
     string = {"type": "string"}
     sources = {"type": "array", "items": string}
     nullable = {"type": ["string", "null"]}
@@ -191,11 +193,29 @@ def research_schema() -> dict[str, Any]:
         "challenge": {"claim_id": string, "objection": string, "source_ids": sources},
         "respond": {
             "challenge_id": string,
-            "response": string,
+            "response": {
+                **ReviewResponse.model_json_schema()["properties"]["response"],
+                "description": "Disposition only. Put the prose explanation in reason.",
+            },
             "reason": string,
             "revised_proposition": nullable,
+            "revision_of": nullable,
+            "source_ids": sources,
         },
-        "adjudicate": {"challenge_id": string, "outcome": string, "reason": string},
+        "adjudicate": {
+            "claim_id": nullable,
+            "challenge_id": nullable,
+            "outcome": ReviewDecision.model_json_schema()["properties"]["outcome"],
+            "reason": string,
+            "source_ids": sources,
+        },
+        "assess": {
+            "claim_id": string,
+            "challenge_id": nullable,
+            "stance": ReviewAssessment.model_json_schema()["properties"]["stance"],
+            "reason": string,
+            "source_ids": sources,
+        },
     }
     variants = []
     for operation, properties in operations.items():
@@ -241,8 +261,14 @@ async def stop_process(process: asyncio.subprocess.Process) -> None:
         await process.wait()
 
 
-async def _read(stream: asyncio.StreamReader, limit: int, events: int | None) -> bytes:
+async def _read(
+    stream: asyncio.StreamReader,
+    limit: int,
+    events: int | None,
+    on_event: Callable[[str], None] | None = None,
+) -> bytes:
     chunks: list[bytes] = []
+    pending = b""
     size = count = 0
     while data := await stream.read(4096):
         size += len(data)
@@ -250,6 +276,27 @@ async def _read(stream: asyncio.StreamReader, limit: int, events: int | None) ->
         if size > limit or (events is not None and count > events):
             raise StreamLimit("CLI output exceeded a bounded stream limit")
         chunks.append(data)
+        if on_event:
+            pending += data
+            while b"\n" in pending:
+                line, pending = pending.split(b"\n", 1)
+                try:
+                    event = json.loads(line)
+                except (ValueError, UnicodeError):
+                    continue  # Final bounded parser remains authoritative.
+                kind = str(event.get("type", "")) if isinstance(event, dict) else ""
+                stage = {
+                    "thread.started": "session_started",
+                    "turn.started": "turn_started",
+                    "turn.completed": "turn_finished",
+                    "error": "provider_error",
+                    "turn.failed": "provider_error",
+                }.get(kind)
+                if kind == "item.completed" and isinstance(event.get("item"), dict):
+                    if event["item"].get("type") == "agent_message":
+                        stage = "output_available"
+                if stage:
+                    on_event(stage)  # Persistence errors abort rather than disappear silently.
     return b"".join(chunks)
 
 
@@ -265,6 +312,7 @@ async def run_process(
     active: dict[UUID, asyncio.subprocess.Process] | None = None,
     call_id: UUID | None = None,
     on_spawn: Callable[[int], None] | None = None,
+    on_event: Callable[[str], None] | None = None,
 ) -> ProcessResult:
     try:
         process = await asyncio.create_subprocess_exec(
@@ -293,7 +341,7 @@ async def run_process(
         finally:
             process.stdin.close()
 
-    read_stdout = asyncio.create_task(_read(process.stdout, stdout_limit, events))
+    read_stdout = asyncio.create_task(_read(process.stdout, stdout_limit, events, on_event))
     read_stderr = asyncio.create_task(_read(process.stderr, stderr_limit, None))
     jobs = [
         asyncio.create_task(feed()),
@@ -567,15 +615,15 @@ class CodexCliProvider:
         validate_cli_profile(profile)
         self.profile = profile
         self.active: dict[UUID, asyncio.subprocess.Process] = {}
+        self.activity_observer: Callable[[str], None] | None = None
 
     def capabilities(self, config: ProviderConfig) -> Capabilities:
         return CLI_CAPABILITIES
 
     def prompt(self, request: ModelRequest) -> bytes:
-        return (
-            "DOXA text research. Tools are disabled. Return only the requested final response.\n"
-            + json.dumps([m.model_dump() for m in request.messages], ensure_ascii=False)
-        ).encode()
+        from doxa.core.context_planning import cli_prompt
+
+        return cli_prompt(request.messages)
 
     def validate_request(self, request: ModelRequest) -> None:
         validate_cli_profile(self.profile)
@@ -589,7 +637,9 @@ class CodexCliProvider:
             or request.adapter not in {None, self.profile.runtime}
         ):
             raise ValueError("CLI request differs from the pinned profile")
-        size = len(self.prompt(request)) + len(json.dumps(request.response_schema or {}).encode())
+        from doxa.core.context_planning import input_size
+
+        size = input_size(request.messages, request.response_schema, True)
         if (
             request.tools
             or not request.messages
@@ -690,6 +740,8 @@ class CodexCliProvider:
 
                 def spawned(pid: int) -> None:
                     diagnostics.update(process_id=pid, stage="process_started")
+                    if self.activity_observer:
+                        self.activity_observer("process_started")
 
                 result = await run_process(
                     argv,
@@ -701,6 +753,7 @@ class CodexCliProvider:
                     active=self.active,
                     call_id=request.call_id,
                     on_spawn=spawned,
+                    on_event=self.activity_observer,
                 )
                 diagnostics.update(exit_code=result.code, stage="process_exited")
                 if result.pid is not None:

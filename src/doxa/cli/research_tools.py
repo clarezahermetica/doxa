@@ -133,7 +133,18 @@ class ResearchToolScreen(ClientModal[None]):
                     from doxa.core.preflight import format_preflight, preflight
 
                     launch_report = await asyncio.to_thread(preflight, self.controller, self.run_id)
-                    result.load_text(format_preflight(launch_report))
+                    from doxa.core.cycle_preflight import cycle_preflight
+
+                    cycle = await asyncio.to_thread(cycle_preflight, self.controller, self.run_id)
+                    result.load_text(
+                        format_preflight(launch_report)
+                        + "\n\nOFFLINE synthetic full-cycle rehearsal: "
+                        + ("passed" if cycle["passed"] else "failed")
+                        + "\n"
+                        + str(cycle["turns_exercised"])
+                        + " turns; zero model calls. "
+                        + str(cycle.get("error") or cycle["limits"])
+                    )
             except (ValueError, KeyError, PermissionError, StopIteration):
                 result.load_text(
                     "Rejected: check selections and authorization. No inference was dispatched."

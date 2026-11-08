@@ -210,6 +210,8 @@ class Runtime:
             return await self.local_model_text(agent, phase, messages, profile, env)
         if not self.command.authorize_paid:
             raise PermissionError("Explicit paid-call authorization required")
+        if not self.command.authorize_external:
+            raise PermissionError("Explicit external disclosure authorization required")
         switch, _ = provider_environment(profile.runtime)
         if not profile.enabled or env.get(switch, "false").lower() != "true":
             raise PermissionError("Provider is disabled")
@@ -371,6 +373,38 @@ class Runtime:
             self.experiment.budget.max_model_calls,
             quota=quota,
         )
+        if quota:
+            from doxa.core.models import ProviderActivity
+            from doxa.providers.cli_session import CodexCliProvider
+
+            if isinstance(provider, CodexCliProvider):
+                progress_count = 0
+
+                def observed(stage: str) -> None:
+                    nonlocal progress_count
+                    if progress_count >= 16:
+                        return
+                    progress_count += 1
+                    record = ProviderActivity.model_validate(
+                        dict(
+                            **self.scope(),
+                            id=self.identity(phase + ":progress:" + str(progress_count)),
+                            call_id=call_id,
+                            agent_id=agent.id,
+                            stage=stage,
+                            process_id=provider.active[call_id].pid
+                            if call_id in provider.active
+                            else None,
+                        )
+                    )
+                    self.emit(
+                        phase + ":progress:" + str(progress_count),
+                        EventType.OBSERVATION_RECEIVED,
+                        (record,),
+                        agent,
+                    )
+
+                provider.activity_observer = observed
         try:
             response = await provider.generate(request)
         except BaseException:

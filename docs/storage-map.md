@@ -44,3 +44,17 @@ a workspace does not merge histories. `workspace-path`, the terminal notice and 
   request, release a reservation or invent a model result.
 
 [Recovery](recovery.md) gives the operator steps for interruption and verified restoration.
+
+## Post-live additive records
+
+Source v21-dev adds ContextManifest selection details plus ProcedureManifest,
+ProviderActivity, ClaimAssessment and ResearchOutcome records in the existing canonical
+events/records and content-addressed artifact store. It does not change the SQL revision.
+New task fields default to legacy fixed-round behavior; old runs without outcomes remain
+unknown. Older executables may reject the new record discriminators: preserve historical
+workspaces/backups and use corrected source for new records.
+
+Exact exports/backups remain private. `public-summary` is a narrow nonidentifying status/count
+whitelist, not a sanitized full history export. Human quality labels append annotations and
+never rewrite claims or judgments. Source-launch diagnostics are read-only and do not replace
+global command targets, preferences or credentials.

@@ -135,3 +135,46 @@ The offline repair made no live model request. A subsequent separately authorize
 one-call smoke completed and persisted a source-linked claim; see [status](status.md).
 Future live tests still require separate approval and acknowledgment of CLI-managed
 transport retries and unknown subscription usage.
+
+## Corrected CLI context and progress path (source v21-dev)
+
+The context planner and Codex request validator share DOXA's exact UTF-8 prompt wrapper,
+JSON escaping and response-schema byte count. Output and remaining experiment/agent limits
+are reserved before dispatch. This is conservative admission, not model-specific tokenization
+or measurement of the CLI/provider's hidden prompt. Full-cycle stress is offline and bounded;
+it cannot guarantee arbitrary future outputs will fit.
+
+Safe process/session/turn/output-available/finish milestones may be committed while a real
+CLI process runs. Raw reasoning item bodies and terminal streams are not displayed as chain
+of thought. Final research output still undergoes ordinary structured validation. The new
+streaming path has offline process-fixture coverage, not another live Codex certification.
+The existing uncertain quota holds remain intact; native CLI retries and unknown subscription
+usage are not converted into a fictitious hard dollar bound. No API-key fallback was added.
+
+## v22-dev: native research choices and explanatory prose
+
+The native output schema now derives `respond.response`, `assess.stance` and
+`adjudicate.outcome` from the corresponding controller contract schemas. This fixes the
+v21 live failure in which a prose paragraph was permitted by the native schema but rejected
+by the controller's response enum. Closed choice fields and controller validation remain
+strict; there is no prose-to-decision guessing, permissive fallback, or automatic retry.
+
+Natural-language explanations remain accepted in `reason`. For example, use
+`response: "qualify"` with the full explanation in `reason`. A prose-only proposal with no
+valid disposition stays preserved in its original model-response artifact and uncommitted;
+it is not converted into an accepted response or historical claim revision. A future
+unclassified commentary operation would need explicit semantics and attribution rather
+than being silently treated as acceptance.
+
+The regression uses the failed output's reduced shape and checks all three native enums
+against the authoritative contracts. Schema overhead is still counted by the shared context
+planner. Source v22-dev requires a fresh source process; the installed v17 is unchanged.
+This correction has no SQL migration or historical rewrite and does not authorize another
+live/subscription call. Full-cycle rehearsal is synthetic and separately labeled.
+
+Verification: 475 full-suite tests passed (one pre-existing Starlette warning), Ruff and
+strict mypy for Windows/Linux passed. All seven acceptance configurations passed isolated
+full-cycle rehearsal with zero live calls. Their events, records, configuration versions,
+quota operations and reservations have the same pre/post logical fingerprint. Record/API
+schemas regenerate unchanged. Native online enforcement of the corrected schema still
+requires a separately approved acceptance call; no such call was made for this correction.

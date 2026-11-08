@@ -131,6 +131,8 @@ def preflight(controller: "Controller", run_id: UUID) -> Preflight:
                 row["status"] = "unavailable"
         requests += rounds * attempts * (1 + task.max_tool_rounds if task else 1)
         participants.append(row)
+    if task and task.research_protocol == "investigation":
+        requests = min(task.council.max_calls, experiment.budget.max_model_calls)
     cap = min(experiment.budget.max_model_calls, task.council.max_calls) if task else 0
     if requests > cap:
         blockers.append("Planned turns including retries and tools exceed the model-call ceiling")

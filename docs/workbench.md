@@ -94,3 +94,21 @@ supported. The optional loopback API is started with `doxa serve`; it is not a g
 Legacy cache-policy CLI examples remain in `examples/council.json`, `backend-run.json`,
 `execute-offline.json` and `memory-query.json`. They are explicit synthetic fixtures for
 compatibility scripting, not live research results or required terminal setup.
+
+## Corrected source research view (v21-dev)
+
+The installed v17 executable does not include these source changes. Use the explicit
+[development launcher](post-live-overhaul.md#windows-launch-and-observation) to choose the
+correct executable and existing workspace without replacing the global command.
+
+Choose Investigation, structured actions and sequential scheduling for a bounded
+claim/criticism/response/reassessment/Archivist cycle. Fixed rounds remain available.
+Ctrl+P offers Inspect claim exchanges, Replay recorded activity, Prepare research control
+and Label revision quality. An exchange opens its full versions and linked arguments;
+citations open separately, and full document text requires an explicit action.
+
+Activity shows actual committed progress, active agent/requested model/effort, elapsed time
+and reported usage. Process/turn milestones do not establish validated claims. Replay reads
+saved events only. Full-cycle offline stress uses a disposable synthetic workspace and does
+not authorize or invoke a model. Supported/rejected results are unverified model judgments;
+correctness/quality gains remain unknown without independent labels and controls.

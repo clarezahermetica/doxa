@@ -150,6 +150,9 @@
                     "$ref": "#/components/schemas/ReviewDecision"
                   },
                   {
+                    "$ref": "#/components/schemas/ReviewAssessment"
+                  },
+                  {
                     "$ref": "#/components/schemas/ReviewAnnotation"
                   },
                   {
@@ -169,6 +172,7 @@
                     "challenge": "#/components/schemas/ReviewChallenge",
                     "respond": "#/components/schemas/ReviewResponse",
                     "adjudicate": "#/components/schemas/ReviewDecision",
+                    "assess": "#/components/schemas/ReviewAssessment",
                     "annotate": "#/components/schemas/ReviewAnnotation",
                     "checkpoint": "#/components/schemas/ReviewCheckpoint",
                     "fork": "#/components/schemas/ReviewFork",
@@ -1410,6 +1414,18 @@
                         "$ref": "#/components/schemas/Claim"
                       },
                       {
+                        "$ref": "#/components/schemas/ProcedureManifest"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ProviderActivity"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ClaimAssessment"
+                      },
+                      {
+                        "$ref": "#/components/schemas/ResearchOutcome"
+                      },
+                      {
                         "$ref": "#/components/schemas/Evidence"
                       },
                       {
@@ -1468,6 +1484,10 @@
                         "run": "#/components/schemas/Run",
                         "trajectory": "#/components/schemas/Trajectory",
                         "claim": "#/components/schemas/Claim",
+                        "procedure_manifest": "#/components/schemas/ProcedureManifest",
+                        "provider_activity": "#/components/schemas/ProviderActivity",
+                        "claim_assessment": "#/components/schemas/ClaimAssessment",
+                        "research_outcome": "#/components/schemas/ResearchOutcome",
                         "evidence": "#/components/schemas/Evidence",
                         "decision": "#/components/schemas/Decision",
                         "challenge": "#/components/schemas/Challenge",
@@ -3663,6 +3683,108 @@
         ],
         "title": "Claim"
       },
+      "ClaimAssessment": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "claim_assessment",
+            "title": "Kind",
+            "default": "claim_assessment"
+          },
+          "claim_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Claim Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "challenge_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challenge Id"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "dispute",
+              "withdraw",
+              "insufficient_evidence"
+            ],
+            "title": "Stance"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Evidence Ids",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "claim_id",
+          "agent_id",
+          "challenge_id",
+          "stance",
+          "reason",
+          "evidence_ids"
+        ],
+        "title": "ClaimAssessment"
+      },
       "ClaimCommand": {
         "properties": {
           "schema_version": {
@@ -4417,6 +4539,13 @@
             "title": "Schema Version",
             "default": 1
           },
+          "max_agent_turns": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Max Agent Turns",
+            "default": 10
+          },
           "max_agents": {
             "type": "integer",
             "maximum": 20.0,
@@ -4488,6 +4617,13 @@
             "title": "Schema Version",
             "default": 1
           },
+          "max_agent_turns": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Max Agent Turns",
+            "default": 10
+          },
           "max_agents": {
             "type": "integer",
             "maximum": 20.0,
@@ -4551,6 +4687,7 @@
         "type": "object",
         "required": [
           "schema_version",
+          "max_agent_turns",
           "max_agents",
           "rounds",
           "concurrency",
@@ -4755,6 +4892,39 @@
           "provenance": {
             "$ref": "#/components/schemas/Provenance"
           },
+          "adjudicator_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adjudicator Id"
+          },
+          "challenge_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challenge Id"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Evidence Ids",
+            "default": []
+          },
           "kind": {
             "type": "string",
             "const": "decision",
@@ -4773,7 +4943,8 @@
               "qualify",
               "revise",
               "investigate",
-              "abstain"
+              "abstain",
+              "reject"
             ],
             "title": "Outcome"
           },
@@ -4822,6 +4993,9 @@
           "run_id",
           "trajectory_id",
           "provenance",
+          "adjudicator_id",
+          "challenge_id",
+          "evidence_ids",
           "kind",
           "claim_id",
           "outcome",
@@ -5200,6 +5374,18 @@
                   "$ref": "#/components/schemas/Claim"
                 },
                 {
+                  "$ref": "#/components/schemas/ProcedureManifest"
+                },
+                {
+                  "$ref": "#/components/schemas/ProviderActivity"
+                },
+                {
+                  "$ref": "#/components/schemas/ClaimAssessment"
+                },
+                {
+                  "$ref": "#/components/schemas/ResearchOutcome"
+                },
+                {
                   "$ref": "#/components/schemas/Evidence"
                 },
                 {
@@ -5258,6 +5444,7 @@
                   "challenge": "#/components/schemas/Challenge",
                   "checkpoint": "#/components/schemas/Checkpoint",
                   "claim": "#/components/schemas/Claim",
+                  "claim_assessment": "#/components/schemas/ClaimAssessment",
                   "context_manifest": "#/components/schemas/ContextManifest",
                   "council_message": "#/components/schemas/CouncilMessage",
                   "decision": "#/components/schemas/Decision",
@@ -5266,7 +5453,10 @@
                   "experiment": "#/components/schemas/Experiment-Output",
                   "memory": "#/components/schemas/Memory",
                   "model_call": "#/components/schemas/ModelCall",
+                  "procedure_manifest": "#/components/schemas/ProcedureManifest",
+                  "provider_activity": "#/components/schemas/ProviderActivity",
                   "reflection_decision": "#/components/schemas/ReflectionDecision",
+                  "research_outcome": "#/components/schemas/ResearchOutcome",
                   "retrieval_audit": "#/components/schemas/RetrievalAudit",
                   "run": "#/components/schemas/Run",
                   "run_state": "#/components/schemas/RunState",
@@ -7570,6 +7760,68 @@
         ],
         "title": "PricingMetadata"
       },
+      "ProcedureManifest": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "procedure_manifest",
+            "title": "Kind",
+            "default": "procedure_manifest"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/ArtifactRef-Output"
+          },
+          "reproducibility": {
+            "type": "string",
+            "const": "procedure_only",
+            "title": "Reproducibility",
+            "default": "procedure_only"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "manifest",
+          "reproducibility"
+        ],
+        "title": "ProcedureManifest"
+      },
       "ProfileReadiness": {
         "properties": {
           "schema_version": {
@@ -7799,6 +8051,94 @@
           "llm_evaluator"
         ],
         "title": "Provenance"
+      },
+      "ProviderActivity": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "process_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Id"
+          },
+          "kind": {
+            "type": "string",
+            "const": "provider_activity",
+            "title": "Kind",
+            "default": "provider_activity"
+          },
+          "call_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Call Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "process_started",
+              "session_started",
+              "turn_started",
+              "output_available",
+              "turn_finished",
+              "provider_error"
+            ],
+            "title": "Stage"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "process_id",
+          "kind",
+          "call_id",
+          "agent_id",
+          "stage"
+        ],
+        "title": "ProviderActivity"
       },
       "ProviderDescriptor": {
         "properties": {
@@ -8049,6 +8389,112 @@
           "considered_actions"
         ],
         "title": "ReflectionDecision"
+      },
+      "ResearchOutcome": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "decision_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Decision Ids",
+            "default": []
+          },
+          "kind": {
+            "type": "string",
+            "const": "research_outcome",
+            "title": "Kind",
+            "default": "research_outcome"
+          },
+          "execution_status": {
+            "type": "string",
+            "enum": [
+              "concluded",
+              "stopped",
+              "interrupted",
+              "failed"
+            ],
+            "title": "Execution Status"
+          },
+          "epistemic_outcome": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "supported",
+              "rejected",
+              "mixed",
+              "unresolved"
+            ],
+            "title": "Epistemic Outcome"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "turns": {
+            "type": "integer",
+            "title": "Turns"
+          },
+          "cycles": {
+            "type": "integer",
+            "title": "Cycles"
+          },
+          "judgment_basis": {
+            "type": "string",
+            "const": "unverified_model_judgments",
+            "title": "Judgment Basis",
+            "default": "unverified_model_judgments"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "decision_ids",
+          "kind",
+          "execution_status",
+          "epistemic_outcome",
+          "reason",
+          "turns",
+          "cycles",
+          "judgment_basis"
+        ],
+        "title": "ResearchOutcome"
       },
       "RespondCommand": {
         "properties": {
@@ -8411,6 +8857,92 @@
         ],
         "title": "ReviewAnnotation"
       },
+      "ReviewAssessment": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Reviewer Id",
+            "default": "local-operator"
+          },
+          "operation": {
+            "type": "string",
+            "const": "assess",
+            "title": "Operation",
+            "default": "assess"
+          },
+          "claim_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Claim Id"
+          },
+          "author_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Author Id"
+          },
+          "challenge_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Challenge Id"
+          },
+          "stance": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "dispute",
+              "withdraw",
+              "insufficient_evidence"
+            ],
+            "title": "Stance"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Source Ids",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "claim_id",
+          "author_id",
+          "stance",
+          "reason"
+        ],
+        "title": "ReviewAssessment"
+      },
       "ReviewChallenge": {
         "properties": {
           "schema_version": {
@@ -8653,16 +9185,56 @@
             "title": "Reviewer Id",
             "default": "local-operator"
           },
+          "reviewer_agent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Agent Id"
+          },
           "operation": {
             "type": "string",
             "const": "adjudicate",
             "title": "Operation",
             "default": "adjudicate"
           },
+          "claim_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Id"
+          },
           "challenge_id": {
-            "type": "string",
-            "format": "uuid",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Challenge Id"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Source Ids",
+            "default": []
           },
           "outcome": {
             "type": "string",
@@ -8671,7 +9243,8 @@
               "qualify",
               "revise",
               "investigate",
-              "abstain"
+              "abstain",
+              "reject"
             ],
             "title": "Outcome"
           },
@@ -8686,7 +9259,6 @@
         "type": "object",
         "required": [
           "idempotency_key",
-          "challenge_id",
           "outcome",
           "reason"
         ],
@@ -8795,6 +9367,27 @@
             "minLength": 1,
             "title": "Reviewer Id",
             "default": "local-operator"
+          },
+          "revision_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Of"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Source Ids",
+            "default": []
           },
           "operation": {
             "type": "string",
@@ -9327,6 +9920,40 @@
             "title": "Schema Version",
             "default": 1
           },
+          "research_protocol": {
+            "type": "string",
+            "enum": [
+              "fixed_rounds",
+              "investigation"
+            ],
+            "title": "Research Protocol",
+            "default": "fixed_rounds"
+          },
+          "plateau_cycles": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Plateau Cycles",
+            "default": 2
+          },
+          "control_condition": {
+            "type": "string",
+            "enum": [
+              "unspecified",
+              "solo",
+              "self_correction",
+              "multi_agent"
+            ],
+            "title": "Control Condition",
+            "default": "unspecified"
+          },
+          "evidence_context_bytes": {
+            "type": "integer",
+            "maximum": 131072.0,
+            "minimum": 256.0,
+            "title": "Evidence Context Bytes",
+            "default": 8192
+          },
           "staged_research": {
             "type": "boolean",
             "title": "Staged Research",
@@ -9473,6 +10100,40 @@
             "title": "Schema Version",
             "default": 1
           },
+          "research_protocol": {
+            "type": "string",
+            "enum": [
+              "fixed_rounds",
+              "investigation"
+            ],
+            "title": "Research Protocol",
+            "default": "fixed_rounds"
+          },
+          "plateau_cycles": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Plateau Cycles",
+            "default": 2
+          },
+          "control_condition": {
+            "type": "string",
+            "enum": [
+              "unspecified",
+              "solo",
+              "self_correction",
+              "multi_agent"
+            ],
+            "title": "Control Condition",
+            "default": "unspecified"
+          },
+          "evidence_context_bytes": {
+            "type": "integer",
+            "maximum": 131072.0,
+            "minimum": 256.0,
+            "title": "Evidence Context Bytes",
+            "default": 8192
+          },
           "staged_research": {
             "type": "boolean",
             "title": "Staged Research",
@@ -9608,6 +10269,10 @@
         "type": "object",
         "required": [
           "schema_version",
+          "research_protocol",
+          "plateau_cycles",
+          "control_condition",
+          "evidence_context_bytes",
           "staged_research",
           "criticism_strategy",
           "structured_actions",

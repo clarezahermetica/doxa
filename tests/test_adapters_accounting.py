@@ -245,7 +245,12 @@ def test_runtime_runpod_is_guarded_and_retries_are_reserved(controller, monkeypa
     )
     bundle = asyncio.run(
         controller.execute_task(
-            run.id, ExecuteTask(authorize_paid=True, upper_bound_usd_per_attempt=Decimal(".1"))
+            run.id,
+            ExecuteTask(
+                authorize_paid=True,
+                authorize_external=True,
+                upper_bound_usd_per_attempt=Decimal(".1"),
+            ),
         )
     )
     assert bundle.run.status == "completed"
@@ -323,7 +328,12 @@ def test_in_flight_provider_cancel_keeps_uncertain_charge(controller, monkeypatc
         )
         task = asyncio.create_task(
             controller.execute_task(
-                run.id, ExecuteTask(authorize_paid=True, upper_bound_usd_per_attempt=Decimal(".1"))
+                run.id,
+                ExecuteTask(
+                    authorize_paid=True,
+                    authorize_external=True,
+                    upper_bound_usd_per_attempt=Decimal(".1"),
+                ),
             )
         )
         await asyncio.wait_for(started.wait(), timeout=5)

@@ -28,6 +28,18 @@ def test_independent_operator_creates_reviews_branches_and_exports_without_inter
         app.theme = theme
         async with app.run_test(size=size) as pilot:
 
+            # Startup schedules the guide after the first refresh. A single pause
+            # can return while its Select is still composing; an early assertion
+            # then shuts down that half-mounted screen and masks the failure.
+            for _ in range(200):
+                await pilot.pause(0.05)
+                if isinstance(app.screen, GettingStarted) and app.screen.is_mounted:
+                    picker = app.screen.query_one("#guide-mode", Select)
+                    if picker.is_mounted and len(picker.children) == 2:
+                        break
+            else:
+                pytest.fail("Getting Started did not finish mounting")
+
             async def activate(selector):
                 control = app.screen.query_one(selector)
                 control.scroll_visible(immediate=True, animate=False, force=True)

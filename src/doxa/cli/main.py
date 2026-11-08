@@ -55,6 +55,76 @@ def read_contract[Model: BaseModel](model: type[Model], path: Path) -> Model:
         ) from None
 
 
+@app.command("runtime-info")
+def runtime_info(
+    data_dir: Path = DEFAULT_DATA_DIR, json_output: bool = typer.Option(False, "--json")
+) -> None:
+    """Identify this runtime, installed launcher and selected workspace without changing them."""
+    from doxa.core.runtime_identity import runtime_identity
+
+    report = runtime_identity(data_dir)
+    if json_output:
+        typer.echo(json.dumps(report, indent=2))
+    else:
+        for key, value in report.items():
+            if value is not None:
+                typer.echo(f"{key.replace('_', ' ')}: {value}")
+
+
+@app.command("public-summary")
+def export_public_summary(run_id: UUID, data_dir: Path = DEFAULT_DATA_DIR) -> None:
+    """Print a metadata-only summary without paths, prompts, endpoints or source text."""
+    from doxa.core.research_manifest import public_summary
+
+    typer.echo(json.dumps(public_summary(controller(data_dir), run_id), indent=2))
+
+
+@app.command("compare-controls")
+def compare_research_controls(
+    baseline: UUID, treatment: UUID, data_dir: Path = DEFAULT_DATA_DIR
+) -> None:
+    """Compare declared conditions, matched inputs, resources and available human labels."""
+    from doxa.core.controls import compare_controls
+
+    typer.echo(json.dumps(compare_controls(controller(data_dir), baseline, treatment), indent=2))
+
+
+@app.command("label-correction")
+def label_research_correction(
+    run_id: UUID,
+    claim_id: UUID,
+    initial: str = "unknown",
+    final: str = "unknown",
+    justified: str = "unknown",
+    notes: str = "",
+    reviewer: str = "local-operator",
+    data_dir: Path = DEFAULT_DATA_DIR,
+) -> None:
+    """Append human revision labels; unknown inputs stay unknown."""
+    from doxa.core.models import Claim
+    from doxa.core.quality_labels import label_correction
+
+    values = {"unknown": None, "yes": True, "no": False}
+    if any(v not in values for v in (initial, final, justified)):
+        raise typer.BadParameter("Use yes, no or unknown for each label")
+    instance = controller(data_dir)
+    claim = instance.ledger.get(claim_id)
+    if not isinstance(claim, Claim):
+        raise typer.BadParameter("Select a versioned claim revision")
+    label_correction(
+        instance,
+        run_id,
+        claim.trajectory_id,
+        claim_id,
+        values[initial],
+        values[final],
+        values[justified],
+        notes,
+        reviewer,
+    )
+    typer.echo("Human labels appended; no automated correctness claim.")
+
+
 @app.command("doctor")
 def doctor(
     data_dir: Path = DEFAULT_DATA_DIR, json_output: bool = typer.Option(False, "--json")

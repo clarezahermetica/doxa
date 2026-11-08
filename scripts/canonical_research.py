@@ -293,7 +293,7 @@ def conduct(workspace: Path, output: Path, corpus: Path) -> dict[str, Any]:
             evaluation = next(
                 p
                 for p in reversed(records)
-                if isinstance(p, Evaluation) and p.evaluator_version == "text-descriptive-v2"
+                if isinstance(p, Evaluation) and p.evaluator_version.startswith("text-descriptive-")
             )
             checkpoint = next(p for p in reversed(records) if isinstance(p, Checkpoint))
             fork = controller.review_command(

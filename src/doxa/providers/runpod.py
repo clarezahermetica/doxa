@@ -19,6 +19,7 @@ from doxa.providers.contracts import (
     ProviderConfig,
     ProviderError,
 )
+from doxa.providers.http_limits import ResponseLimitError, bounded_body
 
 
 def endpoint_url(profile: ModelProfile, env: Mapping[str, str]) -> str:
@@ -195,6 +196,7 @@ class RunPodProvider:
             from doxa.providers.wire import normalize, serialize
 
             route, headers, body = serialize(self.profile, request, key)
+            headers["Accept-Encoding"] = "identity"
             category = "transport"
             uncertain = True
             timeout = min(request.timeout_seconds, self.profile.timeout_seconds)
@@ -213,18 +215,11 @@ class RunPodProvider:
                     headers=headers,
                     json=body,
                 ) as streamed:
-                    chunks = []
-                    received = 0
-                    async for chunk in streamed.aiter_bytes():
-                        received += len(chunk)
-                        if received > 2_000_000:
-                            category = "invalid_response"
-                            raise ValueError("Response size limit exceeded")
-                        chunks.append(chunk)
+                    content = await bounded_body(streamed, 2_000_000)
                     response = httpx.Response(
                         streamed.status_code,
                         headers=streamed.headers,
-                        content=b"".join(chunks),
+                        content=content,
                         request=streamed.request,
                     )
             if response.status_code in {401, 403}:
@@ -264,7 +259,17 @@ class RunPodProvider:
             category, retryable = "timeout", True
         except NotImplementedError:
             category, uncertain = "unsupported", False
-        except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError, AttributeError):
+        except ResponseLimitError:
+            category = "invalid_response"
+        except (
+            httpx.HTTPError,
+            ValueError,
+            KeyError,
+            TypeError,
+            IndexError,
+            AttributeError,
+            RecursionError,
+        ):
             pass
         return ModelResponse(
             call_id=request.call_id,

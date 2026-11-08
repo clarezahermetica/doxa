@@ -211,7 +211,9 @@ def test_configured_complete_price_is_used_by_live_controller_without_manual_ove
         ),
         pricing=pricing,
     )
-    bundle = asyncio.run(controller.execute_task(run.id, ExecuteTask(authorize_paid=True)))
+    bundle = asyncio.run(
+        controller.execute_task(run.id, ExecuteTask(authorize_paid=True, authorize_external=True))
+    )
     assert bundle.run.status == "completed" and bundle.accounting[0]["reserved_microusd"] == 50000
     call = next(r for e in bundle.events for r in e.payload if isinstance(r, ModelCall))
     assert call.usage.pricing_version == "fixture-price-v1"
@@ -360,7 +362,12 @@ def test_ambiguous_timeout_never_retries_and_reservation_survives_restart(contro
     with pytest.raises(ProviderCallFailed, match="timeout"):
         asyncio.run(
             controller.execute_task(
-                run.id, ExecuteTask(authorize_paid=True, upper_bound_usd_per_attempt=Decimal(".1"))
+                run.id,
+                ExecuteTask(
+                    authorize_paid=True,
+                    authorize_external=True,
+                    upper_bound_usd_per_attempt=Decimal(".1"),
+                ),
             )
         )
     reloaded = Controller(controller.settings).inspect(run.id)
@@ -383,7 +390,12 @@ def test_safe_connection_retries_are_bounded_and_each_reserved(controller, monke
     with pytest.raises(ProviderCallFailed):
         asyncio.run(
             controller.execute_task(
-                run.id, ExecuteTask(authorize_paid=True, upper_bound_usd_per_attempt=Decimal(".1"))
+                run.id,
+                ExecuteTask(
+                    authorize_paid=True,
+                    authorize_external=True,
+                    upper_bound_usd_per_attempt=Decimal(".1"),
+                ),
             )
         )
     assert len(calls) == 2
@@ -425,7 +437,12 @@ def test_budget_exhaustion_prevents_transport_and_uncertainty_overrides_concurre
     with pytest.raises(BudgetExceeded):
         asyncio.run(
             controller.execute_task(
-                run.id, ExecuteTask(authorize_paid=True, upper_bound_usd_per_attempt=Decimal(".1"))
+                run.id,
+                ExecuteTask(
+                    authorize_paid=True,
+                    authorize_external=True,
+                    upper_bound_usd_per_attempt=Decimal(".1"),
+                ),
             )
         )
     budget = BudgetStore(controller.settings.database_path)

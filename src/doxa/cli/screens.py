@@ -29,6 +29,7 @@ from doxa.core.models import (
     TaskSpecification,
 )
 from doxa.core.profiles import AgentDefinition
+from doxa.core.research_criteria import REVIEW_DISPUTES
 from doxa.core.text_research import review_adapter
 from doxa.core.workbench import (
     NewAgent,
@@ -104,6 +105,29 @@ class SetupScreen(ClientModal[bool]):
                         markup=False,
                     )
                     with Collapsible(title="Protocol and limits", collapsed=True):
+                        yield Label(
+                            "Investigation requires structured actions and sequential scheduling. "
+                            "Fixed rounds remain available for legacy protocols."
+                        )
+                        yield Select(
+                            [
+                                ("Fixed rounds (legacy)", "fixed_rounds"),
+                                (
+                                    "Investigation: claim, criticism, response, judgment",
+                                    "investigation",
+                                ),
+                            ],
+                            value="fixed_rounds",
+                            allow_blank=False,
+                            id="setup-research-protocol",
+                        )
+                        yield Checkbox(
+                            "Investigation: require criticism and reviewer follow-up before "
+                            "a supported conclusion",
+                            id="setup-review-disputes",
+                            tooltip="Select Investigation above. All configured resource limits "
+                            "still apply; unresolved disputes may stop at a limit.",
+                        )
                         yield Select(
                             [(p.value, p.value) for p in ProtocolMode],
                             value="adversarial_multi_agent",
@@ -257,6 +281,16 @@ class SetupScreen(ClientModal[bool]):
                             name=name,
                             task=TaskSpecification(
                                 question=text,
+                                evaluation_criteria=("citation coverage", "explicit uncertainty")
+                                + (
+                                    (REVIEW_DISPUTES,)
+                                    if self.query_one("#setup-review-disputes", Checkbox).value
+                                    else ()
+                                ),
+                                research_protocol=cast(
+                                    Literal["fixed_rounds", "investigation"],
+                                    self.query_one("#setup-research-protocol", Select).value,
+                                ),
                                 staged_research=self.query_one("#setup-staged", Checkbox).value,
                                 structured_actions=self.query_one(
                                     "#setup-structured", Checkbox

@@ -104,6 +104,7 @@ def describe_record(controller: Controller, record: Any) -> str:
         "model_id",
         "permissions",
         "metrics",
+        "parameters",
         "denominators",
         "reason",
         "response",
@@ -140,13 +141,10 @@ def describe_record(controller: Controller, record: Any) -> str:
     for identity in getattr(record, "evidence_ids", ()):
         evidence = controller.ledger.get(identity)
         lines.append(f"\nEvidence: {getattr(evidence, 'description', '')}")
-        for artifact in getattr(evidence, "artifacts", ()):
-            if artifact.media_type.startswith("text/"):
-                lines.append(
-                    ArtifactStore(controller.settings.data_dir / "artifacts")
-                    .get(artifact)
-                    .decode("utf-8")[:200000]
-                )
+        lines.append("Location: " + str(getattr(evidence, "source_location", None) or "unverified"))
+        lines.append(
+            "Open Claim exchanges / Sources for the relevant passage; full source is separate."
+        )
     if (
         isinstance(record, ModelCall)
         and record.response_artifact

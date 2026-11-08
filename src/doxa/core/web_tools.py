@@ -21,7 +21,7 @@ from pydantic import Field
 from doxa.core.controller import Controller
 from doxa.core.execution import Runtime
 from doxa.core.models import Contract, Event, EventType, Provenance, SourceDocument, ToolAudit
-from doxa.core.secrets import local_env, reject_secrets
+from doxa.core.secrets import reject_secrets, workspace_env
 from doxa.retrieval.dns_worker import public_addresses as public_addresses
 
 
@@ -260,7 +260,11 @@ async def use_tool(
     ):
         raise PermissionError("Run policy and explicit disclosure authorization are required")
     chosen = adapter or ApprovedFetch()
-    if not chosen.synthetic and local_env().get("DOXA_WEB_ENABLED", "false").lower() != "true":
+    if (
+        not chosen.synthetic
+        and workspace_env(controller.settings.data_dir).get("DOXA_WEB_ENABLED", "false").lower()
+        != "true"
+    ):
         raise PermissionError("Live web tools are disabled")
     if chosen.synthetic and runtime.run.execution_kind != "synthetic":
         raise PermissionError("Synthetic tool output requires a synthetic run")

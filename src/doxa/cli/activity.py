@@ -126,6 +126,7 @@ def operations(events: list[Event], experiment: Experiment, query: str = "") -> 
                         "trust",
                         "status",
                         "phase",
+                        "stage",
                     )
                     if getattr(p, k, None)
                 ),
@@ -141,6 +142,19 @@ def operations(events: list[Event], experiment: Experiment, query: str = "") -> 
                 text = text.replace("\n", " ")
                 summary.append(text[:159] + "…" if len(text) > 160 else text)
         row.action = " / ".join(dict.fromkeys(e.type.lower().replace("_", " ") for e in row.events))
+        observable = []
+        for event in row.events:
+            for record in event.payload:
+                if record.kind == "provider_activity":
+                    observable.append("provider: " + record.stage.replace("_", " "))
+                elif record.kind == "claim_assessment":
+                    observable.append("claim reassessment: " + record.stance)
+                elif record.kind == "research_outcome":
+                    observable.append(
+                        "research " + record.execution_status + ": " + record.epistemic_outcome
+                    )
+        if observable:
+            row.action = " / ".join(dict.fromkeys(observable))
         if summary:
             row.result = " · ".join(summary)
         prior_actor = actor if not boundary else None

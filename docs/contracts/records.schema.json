@@ -802,6 +802,104 @@
       "title": "Claim",
       "type": "object"
     },
+    "ClaimAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "experiment_id": {
+          "format": "uuid",
+          "title": "Experiment Id",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trajectory_id": {
+          "format": "uuid",
+          "title": "Trajectory Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "kind": {
+          "const": "claim_assessment",
+          "default": "claim_assessment",
+          "title": "Kind",
+          "type": "string"
+        },
+        "claim_id": {
+          "format": "uuid",
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "challenge_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Challenge Id"
+        },
+        "stance": {
+          "enum": [
+            "accept",
+            "dispute",
+            "withdraw",
+            "insufficient_evidence"
+          ],
+          "title": "Stance",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "default": [],
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "experiment_id",
+        "run_id",
+        "trajectory_id",
+        "provenance",
+        "claim_id",
+        "agent_id",
+        "stance",
+        "reason"
+      ],
+      "title": "ClaimAssessment",
+      "type": "object"
+    },
     "ContextManifest": {
       "additionalProperties": false,
       "properties": {
@@ -957,6 +1055,13 @@
           "const": 1,
           "default": 1,
           "title": "Schema Version",
+          "type": "integer"
+        },
+        "max_agent_turns": {
+          "default": 10,
+          "maximum": 200,
+          "minimum": 1,
+          "title": "Max Agent Turns",
           "type": "integer"
         },
         "max_agents": {
@@ -1160,6 +1265,41 @@
         "provenance": {
           "$ref": "#/$defs/Provenance"
         },
+        "adjudicator_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adjudicator Id"
+        },
+        "challenge_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Challenge Id"
+        },
+        "evidence_ids": {
+          "default": [],
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
         "kind": {
           "const": "decision",
           "default": "decision",
@@ -1177,7 +1317,8 @@
             "qualify",
             "revise",
             "investigate",
-            "abstain"
+            "abstain",
+            "reject"
           ],
           "title": "Outcome",
           "type": "string"
@@ -1974,6 +2115,64 @@
       "title": "Permissions",
       "type": "object"
     },
+    "ProcedureManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "experiment_id": {
+          "format": "uuid",
+          "title": "Experiment Id",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trajectory_id": {
+          "format": "uuid",
+          "title": "Trajectory Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "kind": {
+          "const": "procedure_manifest",
+          "default": "procedure_manifest",
+          "title": "Kind",
+          "type": "string"
+        },
+        "manifest": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "reproducibility": {
+          "const": "procedure_only",
+          "default": "procedure_only",
+          "title": "Reproducibility",
+          "type": "string"
+        }
+      },
+      "required": [
+        "experiment_id",
+        "run_id",
+        "trajectory_id",
+        "provenance",
+        "manifest"
+      ],
+      "title": "ProcedureManifest",
+      "type": "object"
+    },
     "ProtocolMode": {
       "enum": [
         "solo_direct",
@@ -1997,6 +2196,91 @@
       ],
       "title": "Provenance",
       "type": "string"
+    },
+    "ProviderActivity": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "experiment_id": {
+          "format": "uuid",
+          "title": "Experiment Id",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trajectory_id": {
+          "format": "uuid",
+          "title": "Trajectory Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "process_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Process Id"
+        },
+        "kind": {
+          "const": "provider_activity",
+          "default": "provider_activity",
+          "title": "Kind",
+          "type": "string"
+        },
+        "call_id": {
+          "format": "uuid",
+          "title": "Call Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "stage": {
+          "enum": [
+            "process_started",
+            "session_started",
+            "turn_started",
+            "output_available",
+            "turn_finished",
+            "provider_error"
+          ],
+          "title": "Stage",
+          "type": "string"
+        }
+      },
+      "required": [
+        "experiment_id",
+        "run_id",
+        "trajectory_id",
+        "provenance",
+        "call_id",
+        "agent_id",
+        "stage"
+      ],
+      "title": "ProviderActivity",
+      "type": "object"
     },
     "ReflectionDecision": {
       "additionalProperties": false,
@@ -2147,6 +2431,107 @@
         "policy_version"
       ],
       "title": "ReflectionDecision",
+      "type": "object"
+    },
+    "ResearchOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "experiment_id": {
+          "format": "uuid",
+          "title": "Experiment Id",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trajectory_id": {
+          "format": "uuid",
+          "title": "Trajectory Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "decision_ids": {
+          "default": [],
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Decision Ids",
+          "type": "array"
+        },
+        "kind": {
+          "const": "research_outcome",
+          "default": "research_outcome",
+          "title": "Kind",
+          "type": "string"
+        },
+        "execution_status": {
+          "enum": [
+            "concluded",
+            "stopped",
+            "interrupted",
+            "failed"
+          ],
+          "title": "Execution Status",
+          "type": "string"
+        },
+        "epistemic_outcome": {
+          "enum": [
+            "unknown",
+            "supported",
+            "rejected",
+            "mixed",
+            "unresolved"
+          ],
+          "title": "Epistemic Outcome",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "turns": {
+          "title": "Turns",
+          "type": "integer"
+        },
+        "cycles": {
+          "title": "Cycles",
+          "type": "integer"
+        },
+        "judgment_basis": {
+          "const": "unverified_model_judgments",
+          "default": "unverified_model_judgments",
+          "title": "Judgment Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "experiment_id",
+        "run_id",
+        "trajectory_id",
+        "provenance",
+        "execution_status",
+        "epistemic_outcome",
+        "reason",
+        "turns",
+        "cycles"
+      ],
+      "title": "ResearchOutcome",
       "type": "object"
     },
     "RetrievalAudit": {
@@ -2569,6 +2954,40 @@
           "const": 1,
           "default": 1,
           "title": "Schema Version",
+          "type": "integer"
+        },
+        "research_protocol": {
+          "default": "fixed_rounds",
+          "enum": [
+            "fixed_rounds",
+            "investigation"
+          ],
+          "title": "Research Protocol",
+          "type": "string"
+        },
+        "plateau_cycles": {
+          "default": 2,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Plateau Cycles",
+          "type": "integer"
+        },
+        "control_condition": {
+          "default": "unspecified",
+          "enum": [
+            "unspecified",
+            "solo",
+            "self_correction",
+            "multi_agent"
+          ],
+          "title": "Control Condition",
+          "type": "string"
+        },
+        "evidence_context_bytes": {
+          "default": 8192,
+          "maximum": 131072,
+          "minimum": 256,
+          "title": "Evidence Context Bytes",
           "type": "integer"
         },
         "staged_research": {
@@ -3176,6 +3595,7 @@
       "challenge": "#/$defs/Challenge",
       "checkpoint": "#/$defs/Checkpoint",
       "claim": "#/$defs/Claim",
+      "claim_assessment": "#/$defs/ClaimAssessment",
       "context_manifest": "#/$defs/ContextManifest",
       "council_message": "#/$defs/CouncilMessage",
       "decision": "#/$defs/Decision",
@@ -3184,7 +3604,10 @@
       "experiment": "#/$defs/Experiment",
       "memory": "#/$defs/Memory",
       "model_call": "#/$defs/ModelCall",
+      "procedure_manifest": "#/$defs/ProcedureManifest",
+      "provider_activity": "#/$defs/ProviderActivity",
       "reflection_decision": "#/$defs/ReflectionDecision",
+      "research_outcome": "#/$defs/ResearchOutcome",
       "retrieval_audit": "#/$defs/RetrievalAudit",
       "run": "#/$defs/Run",
       "run_state": "#/$defs/RunState",
@@ -3208,6 +3631,18 @@
     },
     {
       "$ref": "#/$defs/Claim"
+    },
+    {
+      "$ref": "#/$defs/ProcedureManifest"
+    },
+    {
+      "$ref": "#/$defs/ProviderActivity"
+    },
+    {
+      "$ref": "#/$defs/ClaimAssessment"
+    },
+    {
+      "$ref": "#/$defs/ResearchOutcome"
     },
     {
       "$ref": "#/$defs/Evidence"

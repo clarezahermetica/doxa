@@ -127,6 +127,7 @@ class BudgetPolicy(Contract):
 
 
 class CouncilLimits(Contract):
+    max_agent_turns: int = Field(default=10, ge=1, le=200)
     max_agents: int = Field(default=20, ge=1, le=20)
     rounds: int = Field(default=2, ge=1, le=10)
     concurrency: int = Field(default=1, ge=1, le=8)
@@ -138,6 +139,12 @@ class CouncilLimits(Contract):
 
 
 class TaskSpecification(Contract):
+    research_protocol: Literal["fixed_rounds", "investigation"] = "fixed_rounds"
+    plateau_cycles: int = Field(default=2, ge=1, le=5)
+    control_condition: Literal["unspecified", "solo", "self_correction", "multi_agent"] = (
+        "unspecified"
+    )
+    evidence_context_bytes: int = Field(default=8192, ge=256, le=131072)
     staged_research: bool = False
     criticism_strategy: Literal["evidence_gaps", "counterexamples", "source_conflicts"] = (
         "evidence_gaps"
@@ -252,9 +259,12 @@ class Evidence(ScopedRecord):
 
 
 class Decision(ScopedRecord):
+    adjudicator_id: UUID | None = None
+    challenge_id: UUID | None = None
+    evidence_ids: tuple[UUID, ...] = ()
     kind: Literal["decision"] = "decision"
     claim_id: UUID
-    outcome: Literal["retain", "qualify", "revise", "investigate", "abstain"]
+    outcome: Literal["retain", "qualify", "revise", "investigate", "abstain", "reject"]
     reason: str
     verification_ids: tuple[UUID, ...] = ()
     policy_version: str
@@ -514,11 +524,57 @@ class ToolAudit(ScopedRecord):
     error_code: str | None = None
 
 
+class ProcedureManifest(ScopedRecord):
+    kind: Literal["procedure_manifest"] = "procedure_manifest"
+    manifest: ArtifactRef
+    reproducibility: Literal["procedure_only"] = "procedure_only"
+
+
+class ProviderActivity(ScopedRecord):
+    process_id: int | None = None
+    kind: Literal["provider_activity"] = "provider_activity"
+    call_id: UUID
+    agent_id: UUID
+    stage: Literal[
+        "process_started",
+        "session_started",
+        "turn_started",
+        "output_available",
+        "turn_finished",
+        "provider_error",
+    ]
+
+
+class ClaimAssessment(ScopedRecord):
+    kind: Literal["claim_assessment"] = "claim_assessment"
+    claim_id: UUID
+    agent_id: UUID
+    challenge_id: UUID | None = None
+    stance: Literal["accept", "dispute", "withdraw", "insufficient_evidence"]
+    reason: str
+    evidence_ids: tuple[UUID, ...] = ()
+
+
+class ResearchOutcome(ScopedRecord):
+    decision_ids: tuple[UUID, ...] = ()
+    kind: Literal["research_outcome"] = "research_outcome"
+    execution_status: Literal["concluded", "stopped", "interrupted", "failed"]
+    epistemic_outcome: Literal["unknown", "supported", "rejected", "mixed", "unresolved"]
+    reason: str
+    turns: int
+    cycles: int
+    judgment_basis: Literal["unverified_model_judgments"] = "unverified_model_judgments"
+
+
 Record = Annotated[
     Experiment
     | Run
     | Trajectory
     | Claim
+    | ProcedureManifest
+    | ProviderActivity
+    | ClaimAssessment
+    | ResearchOutcome
     | Evidence
     | Decision
     | Challenge

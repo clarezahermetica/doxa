@@ -20,6 +20,7 @@ from doxa.core.models import (
     Challenge,
     Checkpoint,
     Claim,
+    ClaimAssessment,
     Contract,
     Decision,
     Evaluation,
@@ -73,6 +74,8 @@ class ReviewChallenge(ReviewBase):
 
 
 class ReviewResponse(ReviewBase):
+    revision_of: UUID | None = None
+    source_ids: tuple[UUID, ...] = ()
     operation: Literal["respond"] = "respond"
     challenge_id: UUID
     author_id: UUID
@@ -81,10 +84,23 @@ class ReviewResponse(ReviewBase):
     revised_proposition: str | None = Field(default=None, min_length=1, max_length=4000)
 
 
+class ReviewAssessment(ReviewBase):
+    operation: Literal["assess"] = "assess"
+    claim_id: UUID
+    author_id: UUID
+    challenge_id: UUID | None = None
+    stance: Literal["accept", "dispute", "withdraw", "insufficient_evidence"]
+    reason: str = Field(min_length=1, max_length=4000)
+    source_ids: tuple[UUID, ...] = ()
+
+
 class ReviewDecision(ReviewBase):
+    reviewer_agent_id: UUID | None = None
     operation: Literal["adjudicate"] = "adjudicate"
-    challenge_id: UUID
-    outcome: Literal["retain", "qualify", "revise", "investigate", "abstain"]
+    claim_id: UUID | None = None
+    challenge_id: UUID | None = None
+    source_ids: tuple[UUID, ...] = ()
+    outcome: Literal["retain", "qualify", "revise", "investigate", "abstain", "reject"]
     reason: str = Field(min_length=1, max_length=4000)
 
 
@@ -116,6 +132,7 @@ ReviewCommand = Annotated[
     | ReviewChallenge
     | ReviewResponse
     | ReviewDecision
+    | ReviewAssessment
     | ReviewAnnotation
     | ReviewCheckpoint
     | ReviewFork
@@ -297,19 +314,21 @@ class TextResearch:
     ) -> Event:
         """Runtime-only structured proposals; model judgments are never verifier evidence."""
         operation = body.get("operation")
-        if operation not in {"claim", "challenge", "respond", "adjudicate"}:
+        if operation not in {"claim", "challenge", "respond", "adjudicate", "assess"}:
             raise ValueError("Unsupported generated research operation")
         if operation == "claim" and body.get("revises_id"):
             previous_claim = self.get(UUID(str(body["revises_id"])), Claim)
             if previous_claim.author_id != actor.id:
                 raise PermissionError("A model may revise only its own attributed claim")
         controlled = {**body, "idempotency_key": phase, "reviewer_id": "model:" + str(actor.id)}
-        if operation in {"claim", "respond"}:
+        if operation in {"claim", "respond", "assess"}:
             controlled["author_id"] = str(actor.id)
         elif operation == "challenge":
             controlled["critic_id"] = str(actor.id)
         elif actor.role != Role.ARCHIVIST:
             raise PermissionError("Only an assigned Archivist may propose model adjudication")
+        else:
+            controlled["reviewer_agent_id"] = str(actor.id)
         command = review_adapter.validate_python(controlled)
         supplied = getattr(command, "source_ids", ())
         if not set(supplied).issubset(visible_source_ids):
@@ -357,6 +376,18 @@ class TextResearch:
                 }
             )
         )
+
+    def related_claims(self, current_id: UUID, ancestor_id: UUID) -> bool:
+        seen: set[UUID] = set()
+        while current_id not in seen:
+            if current_id == ancestor_id:
+                return True
+            seen.add(current_id)
+            claim = self.get(current_id, Claim)
+            if claim.revises_id is None:
+                return False
+            current_id = claim.revises_id
+        return False
 
     def propose(self, command: ReviewCommand) -> Event:
         if isinstance(command, ReviewClaim):
@@ -409,23 +440,34 @@ class TextResearch:
                 for p in self.records.values()
             ):
                 raise ValueError("Challenge already has a response on this branch")
-            target = self.get(challenge.claim_id, Claim)
+            original_target = self.get(challenge.claim_id, Claim)
+            target = (
+                self.get(command.revision_of, Claim) if command.revision_of else original_target
+            )
+            if not self.related_claims(target.id, original_target.id):
+                raise ValueError("Revision target must descend from the challenged claim")
             actor = self.participant(command.author_id)
             if target.author_id != actor.id:
                 raise PermissionError("Only the attributed claim author can respond")
             if command.revised_proposition and command.response not in {"accept", "qualify"}:
                 raise ValueError("Only acceptance/qualification can include a proposed revision")
+            added_evidence = self.source_evidence(command.source_ids, actor)
             response = Challenge(
                 **self.scope(),
                 id=self.identity("response"),
-                claim_id=target.id,
+                claim_id=original_target.id,
                 objection=command.reason,
                 critic_id=challenge.critic_id,
                 responds_to_id=challenge.id,
                 response=command.response,
-                evidence_ids=challenge.evidence_ids,
+                evidence_ids=tuple(
+                    dict.fromkeys((*challenge.evidence_ids, *(e.id for e in added_evidence)))
+                ),
             )
-            records: tuple[Record, ...] = (response,)
+            records: tuple[Record, ...] = (
+                *added_evidence,
+                response,
+            )
             if command.revised_proposition:
                 if target.id not in {c.id for c in commitments(self.events, self.branch.id)}:
                     raise ValueError("Cannot revise an outdated claim through a challenge response")
@@ -437,22 +479,67 @@ class TextResearch:
                     revises_id=target.id,
                     commitment_id=target.commitment_id or target.id,
                     status="proposed",
-                    evidence_ids=target.evidence_ids,
+                    evidence_ids=tuple(
+                        dict.fromkeys((*target.evidence_ids, *(e.id for e in added_evidence)))
+                    ),
                     reconsider_ids=impact(self.events, self.branch.id, target.id),
                 )
                 records += (revision,)
             return self.event(EventType.CHALLENGE_RESPONDED, records, actor)
+        if isinstance(command, ReviewAssessment):
+            self.get(command.claim_id, Claim)
+            actor = self.participant(command.author_id)
+            if command.challenge_id:
+                challenge = self.get(command.challenge_id, Challenge)
+                if not self.related_claims(command.claim_id, challenge.claim_id):
+                    raise ValueError("Assessment challenge must target this claim or an ancestor")
+            evidence = self.source_evidence(command.source_ids, actor)
+            assessment = ClaimAssessment(
+                **self.scope(),
+                id=self.identity("assessment"),
+                claim_id=command.claim_id,
+                agent_id=actor.id,
+                challenge_id=command.challenge_id,
+                stance=command.stance,
+                reason=command.reason,
+                evidence_ids=tuple(e.id for e in evidence),
+            )
+            return self.event(EventType.OBSERVATION_RECEIVED, (*evidence, assessment), actor)
         if isinstance(command, ReviewDecision):
-            challenge = self.get(command.challenge_id, Challenge)
+            decision_challenge = (
+                self.get(command.challenge_id, Challenge) if command.challenge_id else None
+            )
+            claim_id = command.claim_id or (
+                decision_challenge.claim_id if decision_challenge else None
+            )
+            if claim_id is None:
+                raise ValueError("Judgment requires a visible claim or challenge")
+            self.get(claim_id, Claim)
+            if decision_challenge and not self.related_claims(
+                claim_id, decision_challenge.claim_id
+            ):
+                raise ValueError("Judgment claim and challenge refer to unrelated propositions")
+            if command.source_ids and command.reviewer_agent_id is None:
+                raise ValueError("Evidence-linked judgment requires its participant identity")
+            evidence = (
+                self.source_evidence(
+                    command.source_ids, self.participant(command.reviewer_agent_id)
+                )
+                if command.reviewer_agent_id
+                else ()
+            )
             decision = Decision(
                 **self.scope(),
+                challenge_id=decision_challenge.id if decision_challenge else None,
+                adjudicator_id=command.reviewer_agent_id,
+                evidence_ids=tuple(e.id for e in evidence),
                 id=self.identity("decision"),
-                claim_id=challenge.claim_id,
+                claim_id=claim_id,
                 outcome=command.outcome,
                 reason=command.reason,
                 policy_version="human-review-v1",
             )
-            return self.event(EventType.ADJUDICATION_RECORDED, (decision,))
+            return self.event(EventType.ADJUDICATION_RECORDED, (*evidence, decision))
         if isinstance(command, ReviewAnnotation):
             subject = self.ledger.get(command.subject_id)
             if subject.id != self.branch.id and subject.id not in self.records:
@@ -529,22 +616,38 @@ class TextResearch:
                         calls[p.call_id] = p
             measured = list(calls.values())
             addressed = sum(c.id in responses for c in criticisms)
+            from doxa.core.quality_labels import correction_metrics
+
+            quality = correction_metrics(list(self.records.values()))
+            from doxa.core.citation_audit import citation_counts
+
+            citation_audit = citation_counts(self.controller, claims, self.records)
             evaluation = Evaluation(
                 **self.scope(Provenance.SYSTEM_INFERENCE),
                 id=self.identity("evaluation"),
-                evaluator_version="text-descriptive-v2",
+                evaluator_version="text-descriptive-v3",
                 parameters={
                     "criteria": list(self.experiment.task.evaluation_criteria)
                     if self.experiment.task
                     else [],
-                    "citation_measure": "source linkage only; entailment unverified",
+                    "citation_measure": "source/artifact linkage and exact character bounds only; "
+                    "entailment and correctness unverified",
                     "disagreement_measure": "explicit criticism records, not semantic inference",
                     "quality_score": None,
+                    "human_correction_labels": quality,
                 },
                 metrics={
+                    **{f"citation_{key}": float(value) for key, value in citation_audit.items()},
+                    "citation_located_span_rate": citation_audit["located_spans"]
+                    / citation_audit["document_links"]
+                    if citation_audit["document_links"]
+                    else None,
                     "current_claims": float(len(claims)),
                     "known_source_reference_rate": known / len(references) if references else None,
                     "objective_correctness": None,
+                    "initial_claim_accuracy": None,
+                    "final_claim_accuracy": None,
+                    "net_justified_correction": quality["net_justified_correction"],
                     "evidence_linked_claim_rate": linked / len(claims) if claims else None,
                     "challenge_response_rate": sum(c.id in responses for c in criticisms)
                     / len(criticisms)
@@ -569,6 +672,7 @@ class TextResearch:
                     ),
                 },
                 denominators={
+                    "document_citation_links": citation_audit["document_links"],
                     "current_claims": len(claims),
                     "source_references": len(references),
                     "challenges": len(criticisms),

@@ -17,6 +17,7 @@ from textual.widgets import (
     DataTable,
     Footer,
     Input,
+    Label,
     RichLog,
     Select,
     Static,
@@ -34,7 +35,9 @@ from doxa.systems.research import branch_events
 
 
 class ResearchConsole(App[None]):
-    TITLE = "DOXA · Research Console"
+    from doxa.version import TERMINAL_BUILD
+
+    TITLE = "DOXA " + TERMINAL_BUILD + " · Research Console"
     BINDINGS = [
         Binding("q", "quit", "Quit viewer"),
         Binding("r", "refresh", "Refresh ledger", show=False),
@@ -61,7 +64,10 @@ class ResearchConsole(App[None]):
     #activity-pages { height: 1; }
     #activity-pages Button { height: 1; min-height: 1; }
     #action-menu, #activity-search { width: 1fr; }
-    #activity-operations { height: 1fr; }
+    #activity-operations { height: 1fr; width: 1fr; }
+    #live-layout { height: 1fr; }
+    #activity-inspector { width: 48%; height: 1fr; border: none; }
+    #claim-threads { height: 1fr; }
     #activity-pages Button { min-width: 10; }
     #activity-count { width: 1fr; }
     #timeline { display: none; }
@@ -109,7 +115,8 @@ class ResearchConsole(App[None]):
         self.activity_map: dict[str, Operation] = {}
         self.activity_page = -1
         self.selected_operation: Operation | None = None
-
+        self.claim_threads: dict[str, Any] = {}
+        self.thread_signature: object = None
         self.ready = (data_dir / "ledger.sqlite3").is_file()
         self.workspace_error = ""
         if self.ready:
@@ -158,12 +165,17 @@ class ResearchConsole(App[None]):
             with TabPane("Activity", id="activity"):
                 with Horizontal(id="activity-controls"):
                     yield Input(placeholder="Search complete branch history…", id="activity-search")
-                yield DataTable(id="activity-operations", cursor_type="row")
+                with Horizontal(id="live-layout"):
+                    yield DataTable(id="activity-operations", cursor_type="row")
+                    yield TextArea(read_only=True, id="activity-inspector")
                 with Horizontal(id="activity-pages"):
                     yield Button("Earlier", id="activity-earlier")
                     yield Static("", id="activity-count")
                     yield Button("Later", id="activity-later")
                 yield RichLog(wrap=True, markup=False, max_lines=500, id="timeline")
+            with TabPane("Claim exchanges", id="exchanges"):
+                yield DataTable(id="claim-threads", cursor_type="row")
+                yield Label("Enter opens the complete exchange and source navigation", markup=False)
             with TabPane("Inspect", id="inspect"):
                 with Horizontal(id="filter-bar"):
                     yield Select(
@@ -192,18 +204,27 @@ class ResearchConsole(App[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        explicit_experiment = self.selected is not None
         self._persist_theme = True
+        from doxa.core.runtime_identity import runtime_identity
+
+        self.launch_identity = runtime_identity(self.controller.settings.data_dir)
+        if self.launch_identity["warning"]:
+            self.notify(self.launch_identity["warning"], severity="warning", timeout=12)
         if self.appearance_error:
             self.notify(self.appearance_error, severity="warning")
         self.run_column_keys = self.query_one("#runs", DataTable).add_columns(
             "Experiment", "State", "Kind"
         )
         self.render_activity()
+        self.query_one("#claim-threads", DataTable).add_columns(
+            "Current claim", "Position", "Objections / responses"
+        )
         self.query_one("#records", DataTable).add_columns("Record", "State / assignment")
         if self.ready:
             self.action_refresh()
         self.update_actions()
-        if self.offer_guide:
+        if self.offer_guide and not explicit_experiment:
             self.call_after_refresh(self.action_guide)
         elif not self.ready:
             self.call_after_refresh(self.action_workspace)
@@ -224,6 +245,7 @@ class ResearchConsole(App[None]):
         for run in runs:
             exp = self.controller.ledger.get(run.experiment_id)
             assert isinstance(exp, Experiment)
+            assert isinstance(exp, Experiment)
             table.add_row(Text(exp.name), run.status, run.execution_kind, key=str(run.id))
         if self.selected is None and runs:
             self.selected = runs[-1].id
@@ -233,6 +255,19 @@ class ResearchConsole(App[None]):
         self.poll()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        if event.data_table.id == "claim-threads":
+            thread = self.claim_threads.get(str(event.row_key.value))
+            if thread and self.current_bundle:
+                from doxa.cli.research_view import ThreadScreen
+
+                exp = self.controller.ledger.get(self.current_bundle.run.experiment_id)
+                assert isinstance(exp, Experiment)
+                self.push_screen(
+                    ThreadScreen(
+                        self.controller, thread, {a.id: a.display_name for a in exp.agents}
+                    )
+                )
+            return
         if event.data_table.id not in {"runs", "records", "activity-operations"}:
             return
         if event.data_table.id == "activity-operations":
@@ -247,6 +282,7 @@ class ResearchConsole(App[None]):
             return
         self.selected_record = None
         self.selected_operation = None
+        self.query_one(TabbedContent).active = "activity"
         self.query_one("#inspector", TextArea).clear()
         self.selected = UUID(str(event.row_key.value))
         self.branch_id = None
@@ -361,6 +397,7 @@ class ResearchConsole(App[None]):
         self.cursor = len(events)
         self.render_records(events)
         exp = self.controller.ledger.get(bundle.run.experiment_id)
+        assert isinstance(exp, Experiment)
         notice = self.query_one("#notice", Static)
         notice.styles.height = 3
         name = str(getattr(exp, "name", "Experiment"))
@@ -371,7 +408,155 @@ class ResearchConsole(App[None]):
             f"{self.state_label()}{self.sync_status()}\n"
             f"{self.controller.settings.data_dir.resolve()}"
         )
+        self.render_research_status(bundle)
         self.update_actions()
+
+    def render_research_status(self, bundle: RunBundle) -> None:
+        from datetime import UTC, datetime
+
+        from doxa.core.investigation import claim_threads
+        from doxa.core.models import EventType, ResearchOutcome
+
+        exp = self.controller.ledger.get(bundle.run.experiment_id)
+        assert isinstance(exp, Experiment)
+        calls = {p.call_id: p for e in bundle.events for p in e.payload if isinstance(p, ModelCall)}
+        active = next((p for p in calls.values() if p.status == "started"), None)
+        completed = sum(p.status == "completed" for p in calls.values())
+        start = next((e.timestamp for e in bundle.events if e.type == EventType.RUN_STARTED), None)
+        terminal = next(
+            (
+                e.timestamp
+                for e in bundle.events
+                if e.type in {EventType.RUN_CLOSED, EventType.RUN_FAILED, EventType.RUN_CANCELLED}
+            ),
+            bundle.events[-1].timestamp,
+        )
+        end = datetime.now(UTC) if bundle.run.status == "running" else terminal
+        elapsed = max(0, int((end - start).total_seconds())) if start else 0
+        outcome = next(
+            (
+                p
+                for e in reversed(bundle.events)
+                for p in e.payload
+                if isinstance(p, ResearchOutcome)
+            ),
+            None,
+        )
+        who = next(
+            (a.display_name for a in exp.agents if active and a.id == active.agent_id), "none"
+        )
+        assignment = (
+            active.assignment if active else next((a.model for a in exp.agents if a.model), None)
+        )
+        model = assignment.model_id if assignment else "synthetic / unassigned"
+        effort = assignment.settings.get("reasoning", {}) if assignment else {}
+        status = (
+            (outcome.execution_status + " · " + outcome.epistemic_outcome + " · " + outcome.reason)
+            if outcome
+            else self.state_label()
+        )
+        cap = (
+            min(exp.task.council.max_calls, exp.budget.max_model_calls)
+            if exp.task
+            else exp.budget.max_model_calls
+        )
+        tokens = [p.usage for p in calls.values() if p.status == "completed"]
+        inputs = sum(u.input_tokens for u in tokens if u.input_tokens is not None)
+        token_label = (
+            str(inputs) if tokens and all(u.input_tokens is not None for u in tokens) else "unknown"
+        )
+        costs = [p.usage.billed_usd for p in calls.values()]
+        cost_label = (
+            str(sum(v for v in costs if v is not None)) + " USD"
+            if costs and all(v is not None for v in costs)
+            else "unknown"
+        )
+        notice = self.query_one("#notice", Static)
+        notice.styles.height = 4 if self.size.height >= 30 else 3
+        width = max(40, self.size.width)
+        identity = (
+            str(bundle.run.experiment_id) if width >= 100 else str(bundle.run.experiment_id)[:8]
+        )
+        title_space = max(12, width - len(identity) - len(bundle.run.execution_kind) - 8)
+        title = exp.name[:title_space]
+        short_state = status[: max(12, width - 50)]
+        effort_label = (
+            str(effort.get("effort", "default (unverified)"))
+            if isinstance(effort, dict)
+            else "unknown"
+        )
+        notice.update(
+            f"{title} · {bundle.run.execution_kind} · {identity}\n"
+            f"{short_state} · {who[:18]} · {elapsed}s · calls {completed}/{cap}\n"
+            f"Requested {model[:28]} / {effort_label} · cost {cost_label}"
+            + (
+                f"\nReported input: {token_label} · Enter expands; F1 help"
+                if self.size.height >= 30
+                else ""
+            )
+        )
+        signature = (bundle.run.id, self.branch_id, len(bundle.events))
+        if self.thread_signature != signature and self.branch_id:
+            self.thread_signature = signature
+            self.claim_threads = {
+                str(t.current.id): t
+                for t in claim_threads(self.controller, bundle.run.id, self.branch_id)
+            }
+            table = self.query_one("#claim-threads", DataTable)
+            table.clear()
+            for key, thread in self.claim_threads.items():
+                table.add_row(
+                    Text(thread.current.proposition),
+                    Text(thread.position),
+                    f"{len(thread.criticisms)} / {len(thread.responses)}",
+                    key=key,
+                )
+
+    def action_control(self) -> None:
+        if self.selected is None:
+            self.notify("Select a reference experiment first")
+            return
+        from doxa.cli.research_view import ControlScreen
+
+        screen = ControlScreen(self.controller, self.selected)
+
+        def prepared(_: None) -> None:
+            if screen.created_run:
+                self.select_experiment(screen.created_run)
+                self.action_refresh()
+
+        self.push_screen(screen, prepared)
+
+    def action_runtime_info(self) -> None:
+        from doxa.cli.inspectors import DetailScreen, readable_fields
+        from doxa.core.runtime_identity import runtime_identity
+
+        self.push_screen(
+            DetailScreen(
+                "Runtime and launcher",
+                "\n".join(readable_fields(runtime_identity(self.controller.settings.data_dir))),
+            )
+        )
+
+    def action_replay(self) -> None:
+        if not self.current_bundle:
+            self.notify("Select an experiment first")
+            return
+        from doxa.cli.inspectors import DetailScreen
+
+        self.push_screen(
+            DetailScreen(
+                "REPLAY · persisted events only · no inference",
+                "\n".join(
+                    f"{e.sequence} · {e.timestamp:%H:%M:%S} · {e.actor_role} · {e.type}"
+                    for e in self.current_bundle.events
+                ),
+            )
+        )
+
+    def action_exchanges(self) -> None:
+        self.query_one(TabbedContent).active = "exchanges"
+        self.query_one("#claim-threads", DataTable).focus()
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "action-menu":
@@ -732,14 +917,18 @@ class ResearchConsole(App[None]):
         return state
 
     def unavailable_reason(self, action: str) -> str:
-        if action in {"workspace", "help", "guide"}:
+        if action in {"workspace", "help", "guide", "runtime_info"}:
             return ""
         if not self.ready:
             return "Open or create a workspace first"
         if action in {"new", "agent", "model", "inspect", "connection"}:
             return ""
         if action == "details":
-            return "" if self.selected_record is not None else "Select a record in Inspect first"
+            return (
+                ""
+                if self.selected_record is not None or self.selected_operation is not None
+                else "Select an event or an Inspect record first"
+            )
         if self.selected is None:
             return "Select an experiment first"
         bundle = self.current_bundle
@@ -747,6 +936,7 @@ class ResearchConsole(App[None]):
             bundle = self.controller.inspect(self.selected)
         if action in {"start", "import_source"}:
             exp = self.controller.ledger.get(bundle.run.experiment_id)
+            assert isinstance(exp, Experiment)
             if not isinstance(exp, Experiment) or exp.task is None:
                 return "This legacy task uses CLI operations; see Help for run-task/inspection."
         if action == "start":
@@ -761,6 +951,7 @@ class ResearchConsole(App[None]):
             if bundle.run.execution_kind == "live":
                 exp = self.controller.ledger.get(bundle.run.experiment_id)
                 assert isinstance(exp, Experiment)
+                assert isinstance(exp, Experiment)
                 if any(not a.model_profile_id or not a.model for a in exp.agents):
                     return "Model assignment missing. Inspect Agents/Models before live inference."
                 report = self.controller.validate_configuration()
@@ -773,6 +964,7 @@ class ResearchConsole(App[None]):
             if bundle.run.status in {"configured", "running"}:
                 return "Finish or cancel this attempt before configuring another"
             exp = self.controller.ledger.get(bundle.run.experiment_id)
+            assert isinstance(exp, Experiment)
             if not isinstance(exp, Experiment) or not exp.task:
                 return "This operation requires a research experiment"
         if action == "import_source" and bundle.run.status != "configured":
@@ -781,6 +973,7 @@ class ResearchConsole(App[None]):
             return "This run is already terminal"
         if action == "review":
             exp = self.controller.ledger.get(bundle.run.experiment_id)
+            assert isinstance(exp, Experiment)
             if (
                 not isinstance(exp, Experiment)
                 or exp.task is None
@@ -795,6 +988,7 @@ class ResearchConsole(App[None]):
                 return "Create a second trajectory before comparing; text forks are in Review"
         if action == "memory":
             exp = self.controller.ledger.get(bundle.run.experiment_id)
+            assert isinstance(exp, Experiment)
             if not isinstance(exp, Experiment) or not exp.agents:
                 return "This experiment has no participants for a memory query"
         if action == "recovery" and not (
@@ -882,7 +1076,6 @@ doxa doctor --json
 
 Exact accounting (unknown is null):
 """
-
         if not bundle.accounting:
             text += "No paid-operation reservations recorded for this run."
         for item in bundle.accounting:
@@ -942,8 +1135,17 @@ Exact accounting (unknown is null):
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if event.data_table.id == "activity-operations" and event.row_key:
             self.selected_operation = self.activity_map.get(str(event.row_key.value))
+            if self.selected_operation:
+                from doxa.cli.activity import operation_details
+
+                self.query_one("#activity-inspector", TextArea).load_text(
+                    operation_details(self.selected_operation, self.controller)
+                )
 
     def action_details(self) -> None:
+        if self.query_one(TabbedContent).active == "activity" and self.selected_operation:
+            self.push_screen(OperationDetails(self.selected_operation, self.controller))
+            return
         from doxa.cli.inspectors import DetailScreen, describe_record
 
         if self.selected_record is not None:
@@ -954,6 +1156,8 @@ Exact accounting (unknown is null):
             )
 
     def on_resize(self, event: Resize) -> None:
+        if self.query("#activity-inspector"):
+            self.query_one("#activity-inspector").display = event.size.width >= 100
         if self.query("#runs"):
             self.query_one("#runs", DataTable).styles.height = 3 if event.size.height < 30 else 5
         if (

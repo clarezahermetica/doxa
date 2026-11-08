@@ -20,6 +20,12 @@ MAX_FILE_BYTES = 10_000_000
 MAX_TEXT_BYTES = 1_000_000
 
 
+class DocumentTreeBuilder(ElementTree.TreeBuilder):
+    def doctype(self, name: str, pubid: str | None, system: str | None) -> None:
+        # The parser recognizes XML encodings; raw byte scans alone miss UTF-16 DTDs.
+        raise ValueError("XML document types and entities are not permitted")
+
+
 class ParsedDocument(Contract):
     text: str = Field(min_length=1, max_length=MAX_TEXT_BYTES)
     parser_version: str
@@ -47,7 +53,9 @@ def parse_bytes(filename: str, data: bytes) -> ParsedDocument:
             raw = archive.read(document)
             if b"<!DOCTYPE" in raw or b"<!ENTITY" in raw:
                 raise ValueError("XML declarations/entities are not permitted")
-            root = ElementTree.fromstring(raw)
+            root = ElementTree.fromstring(
+                raw, parser=ElementTree.XMLParser(target=DocumentTreeBuilder())
+            )
             ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
             text = "\n".join(
                 "".join(t.text or "" for t in p.findall(".//w:t", ns))
@@ -73,7 +81,9 @@ def parse_bytes(filename: str, data: bytes) -> ParsedDocument:
         if not any((p.split("\n", 1)[1]).strip() for p in parts):
             raise ValueError("No extractable PDF text; OCR is not enabled")
         text = "\n\n".join(parts)
-        parser = "pypdf-text-6.21.2-v1"
+        from importlib.metadata import version
+
+        parser = "pypdf-text-" + version("pypdf") + "-v1"
         warnings = (
             "Text extraction may reorder layout; no OCR or independent content verification.",
         )

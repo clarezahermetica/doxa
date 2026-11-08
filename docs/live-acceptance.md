@@ -55,3 +55,16 @@ CLI equivalents remain available: `doxa run preflight RUN --json`, `doxa run sta
 `doxa run watch RUN`, `doxa run cancel RUN`, `doxa run new-attempt RUN`, and
 `doxa export RUN results.zip`. Flags authorizing paid/external operations are deliberately
 omitted here; no copy-and-paste command should accidentally authorize an unspecified service.
+
+## Post-live research correction boundary (November 4, 2026)
+
+A later genuine research attempt completed two Codex calls before failing on context/input
+bounds. Its history is intentionally incomplete, not an accepted full trajectory. The
+post-live source v21-dev corrects context accounting/selection and adds an opt-in state-driven
+investigation and exchange inspector. All new validation in this pass is offline. No new
+subscription call or empirical quality improvement is claimed.
+
+The [post-live handoff](post-live-overhaul.md) contains the precise source launch, remaining
+limitations and five-call next-acceptance proposal. That proposal is not authorization.
+Prepare a new identity, rehearse its exact configuration, disclose model/effort/calls/time/
+quota limits, then request approval. Never replay the old successful calls to rewrite failure.

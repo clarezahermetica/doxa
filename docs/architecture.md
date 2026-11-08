@@ -102,3 +102,21 @@ in the backend through environment references or Windows DPAPI. No secrets or pr
 workspaces belong in builds, exports or version control. Generated-code execution stays
 disabled until an enforced isolated runner and quotas exist. Studio and native desktop
 clients are retired from the published tree.
+
+## Post-live investigation extension (source v21-dev, offline verified)
+
+The existing controller/ledger now supports an opt-in, sequential `investigation` task
+protocol alongside legacy fixed rounds. Ledger-derived claim threads feed targeted
+criticism, author responses/revisions, reassessments and attributed Archivist judgments.
+`ResearchOutcome` separates stopped/failed/incomplete execution from an epistemic result;
+LLM-supported/rejected conclusions remain unverified model judgments. No second history,
+SQL migration or six-system replacement is introduced.
+
+Context planning and CLI validation share request serialization, schema cost and output
+reservation. Required active exchanges precede bounded relevant permitted evidence; omitted
+material is recorded. Full-cycle preflight executes synthetic stress in an isolated workspace,
+not a live probe. Safe CLI milestones are persisted separately from validated final research
+operations; private reasoning bodies are not exposed.
+
+See [the post-live handoff](post-live-overhaul.md) for exact boundaries, protocol controls,
+procedure manifests, null quality metrics, compatibility and source launch instructions.
