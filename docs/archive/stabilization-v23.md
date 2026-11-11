@@ -1,5 +1,8 @@
 # Post-v22 stabilization (source v23-dev)
 
+> Historical development report. Version, installation, and verification statements
+> describe this pass only. Use the [current documentation](../README.md) for instructions.
+
 This pass applies to the cumulative development checkout, not the published starter or
 installed executable. It preserves the v22 live history and uses no new live inference,
 Moss or RunPod requests. Nothing is committed, published, installed globally or released.
@@ -93,7 +96,7 @@ passes. Public schemas reproduce exactly. The final advisory check found no matc
 exception-handling caution and one XML-parser caution. These are triaged source locations,
 not 76 confirmed vulnerabilities. Fixed-argument subprocesses, bounded exception fallback
 and parser-level DTD rejection supply relevant controls; assertions are not substitutes
-for controller input validation. See also [status](status.md).
+for controller input validation. See also [status](../status.md).
 
 A complete isolated offline investigation also passed archive inspection (14 files),
 backup/restore and exact run-history comparison. The restored workspace contains 16

@@ -1,5 +1,8 @@
 # Post-live overhaul: audit and verification map
 
+> Historical development report. Version, installation, and verification statements
+> describe this pass only. Use the [current documentation](../README.md) for instructions.
+
 ## Confirmed baseline (November 4, 2026)
 
 The native CLI completed two genuine calls in the failed research experiment. Preserve
