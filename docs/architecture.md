@@ -51,7 +51,7 @@ resistance against an operator controlling the database or filesystem.
 Artifacts use content-addressed SHA-256 paths and verified reads. Migrations retain
 historical records. Integrity checks reconstruct indexed records from event payloads;
 backups and restoration verify history and artifact hashes without merging workspaces.
-See [storage](workspaces.md) and [recovery](workspaces.md#recovery-principles).
+See [storage](storage-map.md) and [recovery](recovery.md).
 
 ## Execution and model boundaries
 
@@ -63,7 +63,7 @@ billing remains null.
 
 The provider registry accepts arbitrary model IDs through compatible trusted adapters.
 Native transports and OpenAI-compatible endpoints are documented in
-[provider support](providers.md). Registration, saving a profile and local
+[provider support](provider-support.md). Registration, saving a profile and local
 readiness inspection do not establish that a connection works. Paid inference and
 external disclosure require separate authorization and durable admission before dispatch.
 Uncertain external requests are not automatically replayed or refunded.
@@ -72,7 +72,7 @@ Account CLIs use a distinct `cli_session` profile transport, existing provider c
 and the same controller. A trusted executable adapter runs without a shell in an empty
 temporary working directory; session references remain local. Subscription-quota admission
 is transactional in the canonical ledger, separate from dollar reservations; unknown
-consumption/cost stays null. See [CLI providers](providers.md#configure-codex-in-the-terminal) for controls and limits.
+consumption/cost stays null. See [CLI providers](cli-providers.md) for controls and limits.
 
 ## Evidence and tools
 
@@ -103,7 +103,7 @@ workspaces belong in builds, exports or version control. Generated-code executio
 disabled until an enforced isolated runner and quotas exist. Studio and native desktop
 clients are retired from the published tree.
 
-## Investigation protocol
+## Post-live investigation extension (source v21-dev, offline verified)
 
 The existing controller/ledger now supports an opt-in, sequential `investigation` task
 protocol alongside legacy fixed rounds. Ledger-derived claim threads feed targeted
@@ -118,32 +118,5 @@ material is recorded. Full-cycle preflight executes synthetic stress in an isola
 not a live probe. Safe CLI milestones are persisted separately from validated final research
 operations; private reasoning bodies are not exposed.
 
-See the [workbench](workbench.md#investigations-and-outcomes) for protocol controls and
-procedure manifests, [development](development.md#select-the-source-runtime) for source
-launching, and [status](status.md) for observed verification and remaining limits.
-
-
-
-## Design provenance
-
-These references identify the original DOXA design material consulted during development.
-They are design inputs, not evidence that a feature is implemented or scientifically validated.
-Current behavior and limitations are documented in [architecture](architecture.md) and
-[status](status.md). Historical handoff reports are in the [development archive](archive/README.md).
-These links are provenance, not refreshed specifications or a prerequisite for installation.
-
-| Design reference | Subject |
-| --- | --- |
-| [Original design lock](https://app.notion.com/p/3fd03b8af6fc81829c27df96c35f392c) | Initial research invariants and release ambitions. |
-| [Research and Build HQ](https://app.notion.com/p/3f103b8af6fc819f8359c331aedc8465) | Project identity and goals. |
-| [System architecture](https://app.notion.com/p/3f103b8af6fc816db112d46752ccd016) | Shared controller and module boundaries. |
-| [Events and entities](https://app.notion.com/p/3f103b8af6fc81b6ac43f8758dfeaaeb) | History, identities and provenance. |
-| [Agent Council](https://app.notion.com/p/3f103b8af6fc817db1c3c81b41bb2e55) | Roles and protocols. |
-| [Provider strategy](https://app.notion.com/p/3f103b8af6fc8122a704cd362983deac) | Model/runtime separation and capabilities. |
-| [Repository plan](https://app.notion.com/p/3f103b8af6fc81aeb6dfe844bb02b1c5) | Original stack and organization. |
-| [Epistemic Git](https://app.notion.com/p/3f103b8af6fc81cc9fcff32cab2b6eba) | Claims and immutable revisions. |
-| [Counterfactual Engine](https://app.notion.com/p/3f103b8af6fc8180b6c1fff62e6d66c5) | Branches and checkpoints. |
-| [False Critic](https://app.notion.com/p/3f103b8af6fc81cb8490c3e66b2454aa) | Criticism and correction. |
-| [Memory Tribunal](https://app.notion.com/p/3f103b8af6fc813dbb24d50a13717f77) | Memory eligibility. |
-| [Self-Correction Gym](https://app.notion.com/p/3f103b8af6fc8109a6c6e778c8da6187) | Trajectory evaluation and annotation. |
-| [Adaptive Reflection](https://app.notion.com/p/3f103b8af6fc81d990c5efdebd493041) | Bounded intervention policy. |
+See [the post-live handoff](post-live-overhaul.md) for exact boundaries, protocol controls,
+procedure manifests, null quality metrics, compatibility and source launch instructions.

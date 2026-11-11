@@ -1,8 +1,5 @@
 # v24: bounded dispute review, citation diagnostics and terminal update
 
-> Historical development report. Version, installation, and verification statements
-> describe this pass only. Use the [current documentation](../README.md) for instructions.
-
 This pass adds no providers, live calls, unlimited loop, automatic billing reconciliation
 or execution resume. The existing controller, canonical ledger and frozen terminal remain
 the application. Older builds and experimental histories are retained.
