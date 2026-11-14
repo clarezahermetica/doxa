@@ -52,7 +52,12 @@ def endpoint_url(profile: ModelProfile, env: Mapping[str, str]) -> str:
     try:
         parsed = urlsplit(url)
         port = parsed.port
-    except ValueError:
+        wire_url = httpx.URL(url)
+        if wire_url.scheme != parsed.scheme or wire_url.port not in {None, port}:
+            raise ValueError("Ambiguous provider URL")
+        if profile.local and wire_url.host not in {"127.0.0.1", "::1", "localhost"}:
+            raise ValueError("Invalid loopback provider URL")
+    except (ValueError, httpx.InvalidURL):
         raise ValueError("Invalid provider URL syntax") from None
     if profile.runtime == "runpod":
         import re

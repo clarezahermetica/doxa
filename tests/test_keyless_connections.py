@@ -436,3 +436,20 @@ def test_credential_input_never_copies_and_terminal_fatal_error_has_no_locals(
     except RuntimeError:
         app._fatal_error()
     assert messages and DUMMY not in str(messages)
+
+
+
+def test_invalid_httpx_hostname_is_a_safe_non_dispatch_error():
+    profile = local_profile(
+        "custom", local=False, base_url="https://" + chr(0x200D) + ".invalid/v1"
+    )
+    report = asyncio.run(
+        discover_models(
+            profile,
+            {},
+            authorize_network=True,
+            transport=httpx.MockTransport(lambda _: pytest.fail("Unexpected request")),
+        )
+    )
+    assert report.status == "unavailable"
+    assert report.runtime_reachable is None
