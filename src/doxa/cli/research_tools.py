@@ -114,7 +114,7 @@ class ResearchToolScreen(ClientModal[None]):
                     )
                 elif self.operation == "connection":
                     from doxa.core.secrets import workspace_env
-                    from doxa.providers.discovery import discover_models
+                    from doxa.providers.discovery import describe_connection, discover_models
 
                     profile = next(
                         p
@@ -126,8 +126,14 @@ class ResearchToolScreen(ClientModal[None]):
                         workspace_env(self.controller.settings.data_dir),
                         authorize_network=self.query_one("#tool-authorize", Checkbox).value,
                     )
+                    self.query_one("#tool-authorize", Checkbox).value = False
                     result.load_text(
-                        report.status + "\n" + report.detail + "\n" + "\n".join(report.model_ids)
+                        f"Registered: {profile.id} v{profile.version}\n"
+                        f"Declared text: {profile.capabilities.text_generation}; "
+                        f"structured output: {profile.capabilities.structured_output}.\n"
+                        + describe_connection(report)
+                        + "\n\n"
+                        + "\n".join(report.model_ids)
                     )
                 elif self.operation == "preflight" and self.run_id:
                     from doxa.core.preflight import format_preflight, preflight

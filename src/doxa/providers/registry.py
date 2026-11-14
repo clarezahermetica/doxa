@@ -186,7 +186,7 @@ def readiness(profile: ModelProfile, env: Mapping[str, str]) -> ProfileReadiness
         # These messages are constants in validators, never raw URL/credential inputs.
         issues.append(str(exc))
     if not present:
-        issues.append("Credential is missing; set the referenced backend environment variable")
+        issues.append("Credential missing or unavailable; check the stored key or legacy reference")
     try:
         if not profile.local:
             spending_allowance(profile, env)

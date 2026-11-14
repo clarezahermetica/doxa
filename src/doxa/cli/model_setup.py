@@ -1,4 +1,4 @@
-"""Model-first terminal setup. No discovery, connection test or inference is performed."""
+"""Terminal model registration and explicit, non-generative connection checks."""
 
 import asyncio
 import dataclasses
@@ -28,6 +28,16 @@ from doxa.core.controller import Controller
 from doxa.core.profiles import CouncilConfig, ModelProfile
 
 
+class SecretInput(Input):
+    """Masked input without an application clipboard copy or cut action."""
+
+    def action_copy(self) -> None:
+        pass
+
+    def action_cut(self) -> None:
+        self.delete_selection()
+
+
 class ModelScreen(ClientModal[bool]):
     CSS = """
     ModelScreen { align: center middle; }
@@ -50,6 +60,8 @@ class ModelScreen(ClientModal[bool]):
             "Other / Custom", "Custom", profile.model_id if profile else ""
         )
         self.last_connection = ""
+        self.discovery_target: tuple[str, str, str, str, bool, str] | None = None
+        self.available_references: set[str] | None = None
         self.catalog_error = ""
         self.saved_note: dict[str, Any] = {}
         try:
@@ -98,6 +110,8 @@ class ModelScreen(ClientModal[bool]):
             yield Label("Choose a model, then its connection — saving makes no network request")
             with VerticalScroll(id="model-scroll"):
                 with Vertical(id="model-identity-page"):
+                    if p is None:
+                        yield Button("Find models on a local server", id="model-local-setup")
                     yield Label(
                         "Search the offline catalog; families need an exact ID. Enter any c"
                         "ustom ID."
@@ -189,35 +203,57 @@ class ModelScreen(ClientModal[bool]):
                             value=p.local if p else False,
                             id="model-local",
                         )
+                    with Vertical(id="local-discovery"):
+                        yield Button("List local models (read-only)", id="model-discover")
+                        yield Select[str]([], id="model-discovered", prompt="Choose a listed model")
+                        yield Label("", id="model-discovery-status", markup=False)
+                        yield Label(
+                            "A loopback server may still forward requests outside this machine."
+                        )
                     with Vertical(id="auth-fields"):
                         yield Label(
                             "Authentication — native adapters use their own documented key header"
                         )
                         yield Select(
                             [("Credential reference", "bearer"), ("No authentication", "none")],
-                            value=p.authentication if p else "bearer",
+                            value=(
+                                p.authentication if p and p.transport != "cli_session" else "bearer"
+                            ),
                             allow_blank=False,
                             id="model-auth",
                         )
                         with Vertical(id="credential-fields"):
-                            yield Label(
-                                "Credential reference name (environment or local Windows secret sto"
-                                "re)"
-                            )
-                            yield Input(
-                                value=(p.credential_env or "") if p else "MODEL_API_KEY",
-                                id="model-env",
-                            )
                             with Collapsible(
-                                title="Add a new credential securely (optional)",
+                                title="API credential (optional secure storage)",
                                 collapsed=True,
                                 id="secret-entry",
                             ):
                                 yield Label(
-                                    "Optional NEW secret value (masked; "
-                                    "existing secrets cannot be overwritten)"
+                                    "Enter a new key to store securely on Save. "
+                                    "Leave blank to keep the existing reference."
                                 )
-                                yield Input(password=True, id="model-secret")
+                                yield SecretInput(password=True, id="model-secret")
+                                yield Label("Existing reference (advanced; never enter a key here)")
+                                yield Input(
+                                    value=(p.credential_env or "") if p else "MODEL_API_KEY",
+                                    id="model-env",
+                                )
+                                yield Checkbox(
+                                    "Copy this legacy credential into protected storage on Save",
+                                    id="model-migrate-secret",
+                                )
+                                if p and p.credential_env and p.authentication == "bearer":
+                                    yield Label(
+                                        "Replace or remove the key used by this saved profile. "
+                                        "All versions sharing the reference are affected. Removal "
+                                        "does not revoke a key at its provider."
+                                    )
+                                    yield Checkbox(
+                                        "Confirm change to the saved reference",
+                                        id="model-confirm-secret",
+                                    )
+                                    yield Button("Replace stored key", id="model-replace-secret")
+                                    yield Button("Delete local key", id="model-delete-secret")
                     with Vertical(id="artifact-fields"):
                         yield Label(
                             "Optional repository identifier — registration, not weight loading"
@@ -390,7 +426,11 @@ class ModelScreen(ClientModal[bool]):
         if self.is_mounted:
             if event.input.id == "catalog-search":
                 self.search()
-            elif event.input.id in {"model-id", "model-env", "model-secret"}:
+            elif event.input.id in {"model-url", "model-env"}:
+                self.clear_stale_discovery()
+                if event.input.id == "model-env":
+                    self.update_status()
+            elif event.input.id == "model-id":
                 self.update_status()
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
@@ -422,6 +462,19 @@ class ModelScreen(ClientModal[bool]):
         self.query_one("#model-id" if self.page == 0 else "#model-name", Input).focus()
 
     def on_select_changed(self, event: Select.Changed) -> None:
+        if (
+            event.select.id == "model-discovered"
+            and isinstance(event.value, str)
+            and self.discovery_target == self.local_target()
+        ):
+            self.query_one("#model-id", Input).value = event.value
+            self.query_one("#model-discovery-status", Label).update(
+                "Selected model is listed by this runtime. Inference remains untested."
+            )
+            if not self.input("model-name"):
+                self.query_one("#model-name", Input).value = (
+                    re.sub(r"[^A-Za-z0-9_-]", "-", event.value)[:64] or "local-model"
+                )
         if self.is_mounted and event.select.id in {
             "model-connection",
             "model-provider",
@@ -443,7 +496,11 @@ class ModelScreen(ClientModal[bool]):
             self.last_connection = str(key)
             if not first_edit:
                 self.query_one("#model-provider", Select).value = connection.protocol
-                self.query_one("#model-env", Input).value = connection.credential
+                self.query_one("#model-secret", Input).value = ""
+                self.query_one("#model-migrate-secret", Checkbox).value = False
+                self.query_one("#model-env", Input).value = (
+                    "" if connection.local else connection.credential
+                )
                 self.query_one("#model-local", Checkbox).value = connection.local
                 self.query_one("#model-auth", Select).value = (
                     "none" if connection.local else "bearer"
@@ -484,7 +541,11 @@ class ModelScreen(ClientModal[bool]):
         authenticated = self.query_one("#model-auth", Select).value != "none"
         self.query_one("#credential-fields").display = authenticated and not cli
         self.query_one("#model-secret").display = implemented and not cli
-        self.query_one("#secret-entry").display = implemented and not cli
+        self.query_one("#model-migrate-secret").display = implemented and not cli
+        self.query_one("#local-discovery").display = (
+            compatible and self.query_one("#model-local", Checkbox).value
+        )
+        self.clear_stale_discovery()
         self.query_one("#artifact-fields").display = (
             compatible
             and self.query_one("#model-local", Checkbox).value
@@ -543,13 +604,25 @@ class ModelScreen(ClientModal[bool]):
             )
         else:
             authenticated = self.query_one("#model-auth", Select).value != "none"
-            present = bool(self.input("model-secret")) or bool(
-                workspace_env(self.controller.settings.data_dir).get(self.input("model-env"))
-            )
+            if authenticated and self.available_references is None:
+                self.available_references = {
+                    name for name, value in workspace_env(self.controller.settings.data_dir).items()
+                    if value and value != "replace_me"
+                }
+            present = self.input("model-env") in (self.available_references or set())
             state += "Compatible text adapter exists; endpoint/model acceptance is unverified. "
-            if authenticated and not present:
-                state += "Credentials required: reference missing. "
-            state += "Live execution needs separate authorization."
+            state += (
+                "Credential not required. " if not authenticated else
+                "Credential available. " if present else
+                "Credentials required: missing reference or vault unavailable. "
+            )
+            state += (
+                f"Text capability: {self.query_one('#model-text-capability', Select).value} "
+                "(declaration only). "
+                "Inference untested by setup; execution authorization is separate."
+            )
+            if self.profile:
+                state = f"Registered: {self.profile.id} v{self.profile.version}. " + state
         self.query_one("#model-summary", Label).update(
             "Model: "
             + self.input("model-developer")
@@ -587,8 +660,21 @@ class ModelScreen(ClientModal[bool]):
         elif event.button.id in {"model-next", "model-back"}:
             self.page = 1 if event.button.id == "model-next" else 0
             self.show_page()
+        elif event.button.id == "model-local-setup":
+            self.query_one("#model-connection", Select).value = "ollama"
+            self.update_connection_fields()
+            self.page = 1
+            self.show_page()
         elif event.button.id == "model-save":
             await self.save()
+        elif event.button.id == "model-discover":
+            event.button.disabled = True
+            try:
+                await self.discover_local()
+            finally:
+                event.button.disabled = False
+        elif event.button.id in {"model-replace-secret", "model-delete-secret"}:
+            await self.change_saved_secret(event.button.id == "model-delete-secret")
         elif event.button.id == "model-cli-check":
             from doxa.providers.cli_session import check_installed_clis
 
@@ -606,8 +692,93 @@ class ModelScreen(ClientModal[bool]):
             finally:
                 event.button.disabled = False
 
+    def clear_stale_discovery(self) -> None:
+        if self.discovery_target is not None and self.discovery_target != self.local_target():
+            self.discovery_target = None
+            self.query_one("#model-discovered", Select).set_options([])
+            self.query_one("#model-discovery-status", Label).update("")
+
+    def local_target(self) -> tuple[str, str, str, str, bool, str]:
+        return (
+            str(self.query_one("#model-connection", Select).value),
+            self.input("model-url"),
+            str(self.query_one("#model-auth", Select).value),
+            self.input("model-env"),
+            self.query_one("#model-local", Checkbox).value,
+            str(self.query_one("#model-provider", Select).value),
+        )
+
+    async def discover_local(self) -> None:
+        from doxa.core.secrets import reject_secrets, workspace_env
+        from doxa.providers.discovery import describe_connection, discover_models
+
+        status = self.query_one("#model-discovery-status", Label)
+        selection = self.query_one("#model-discovered", Select)
+        selection.set_options([])
+        self.discovery_target = None
+        target = self.local_target()
+        key, url, auth, reference, local, runtime = target
+        directory = self.controller.settings.data_dir
+        try:
+            # A URL must not embed a known secret. An unsaved key is never sent.
+            reject_secrets(url, directory=directory, credential_names=(reference,))
+            pending = self.query_one("#model-secret", Input).value
+            if pending and pending in url:
+                raise ValueError("Secret in URL")
+            if not local or runtime != "openai_compatible":
+                raise ValueError("Expected loopback compatible runtime")
+            profile = ModelProfile.model_validate(
+                dict(
+                    id="local-discovery",
+                    provider="ollama" if key == "ollama" else "openai_compatible",
+                    adapter="openai_compatible",
+                    local=True,
+                    base_url=url,
+                    model_id=self.input("model-id") or "unselected",
+                    authentication=auth,
+                    credential_env=reference or None if auth == "bearer" else None,
+                )
+            )
+            env = await asyncio.to_thread(workspace_env, directory)
+            report = await discover_models(profile, env, authorize_network=True)
+        except (ValueError, OSError):
+            status.update("Check loopback URL and credential reference. No inference requested.")
+            return
+        if target == self.local_target():
+            self.discovery_target = target
+            selection.set_options([(Text(model), model) for model in report.model_ids])
+            status.update(describe_connection(report))
+
+    async def change_saved_secret(self, delete: bool) -> None:
+        from doxa.core.credential_store import delete_credential, replace_credential
+
+        field = self.query_one("#model-secret", Input)
+        status = self.query_one("#model-error", Label)
+        confirmation = self.query_one("#model-confirm-secret", Checkbox)
+        reference = self.profile.credential_env if self.profile else None
+        if not confirmation.value or reference is None:
+            status.update("Confirm the operation on the saved reference first.")
+            return
+        confirmation.value = False
+        value = field.value
+        field.value = ""
+        try:
+            directory = self.controller.settings.data_dir
+            if delete:
+                await asyncio.to_thread(delete_credential, directory, reference)
+                status.update("Local copy removed. The provider key was not revoked.")
+            else:
+                await asyncio.to_thread(replace_credential, directory, reference, value)
+                status.update("Stored key replaced. Profile and experiment versions are unchanged.")
+        except (ValueError, OSError):
+            status.update("Could not change the stored key. Check vault access and the reference.")
+        self.available_references = None
+        self.update_status()
+
     async def save(self) -> None:
         wrote_profile = False
+        pending = self.query_one("#model-secret", Input).value
+        self.query_one("#model-secret", Input).value = ""
         try:
             name = self.input("model-name")
             if not re.fullmatch(r"[A-Za-z0-9_-]+", name) or not self.input("model-id"):
@@ -635,6 +806,8 @@ class ModelScreen(ClientModal[bool]):
                 p.provider for p in self.controller.provider_catalog() if p.implemented
             }
             if not implemented:
+                if pending:
+                    raise ValueError("Registration-only connections cannot store API keys")
                 url = self.input("model-url")
                 if url:
                     parsed = urlsplit(url)
@@ -649,10 +822,13 @@ class ModelScreen(ClientModal[bool]):
                         raise ValueError(
                             "Registration URL must be HTTPS without credentials, query or fragment."
                         )
-                reference = self.input("model-env")
-                if not re.fullmatch(r"[A-Z][A-Z0-9_]*", reference):
+                registration_reference = self.input("model-env")
+                if not re.fullmatch(r"[A-Z][A-Z0-9_]*", registration_reference):
                     raise ValueError("Enter a credential reference name, not a secret value.")
-                note.update(registration_only=True, base_url=url, credential_reference=reference)
+                note.update(
+                    registration_only=True, base_url=url,
+                    credential_reference=registration_reference,
+                )
                 save_catalog_note(self.controller.settings.data_dir, note)
                 self.notify(
                     "Registration saved; transport unsupported. No model profile or cre"
@@ -684,6 +860,13 @@ class ModelScreen(ClientModal[bool]):
                     "saving disabled is allowed."
                 )
             values = self.profile.model_dump() if self.profile else {}
+            auth = str(self.query_one("#model-auth", Select).value)
+            reference = self.input("model-env") or None
+            if auth != "bearer":
+                reference = None
+            migrate = self.query_one("#model-migrate-secret", Checkbox).value
+            if (pending or migrate) and (auth != "bearer" or runtime == "codex_cli"):
+                raise ValueError("Secure API storage is only for API credential connections")
             values.update(
                 id=name,
                 version=self.profile.version + 1 if self.profile else 1,
@@ -703,8 +886,8 @@ class ModelScreen(ClientModal[bool]):
                 local=self.query_one("#model-local", Checkbox).value
                 if runtime == "openai_compatible"
                 else False,
-                authentication=str(self.query_one("#model-auth", Select).value),
-                credential_env=self.input("model-env"),
+                authentication=auth,
+                credential_env=reference or ("MODEL_API_KEY" if pending else None),
                 base_url=self.input("model-url") or None,
                 endpoint_id=self.input("model-endpoint") or None if runtime == "runpod" else None,
                 repository_id=self.input("model-repository")
@@ -776,19 +959,30 @@ class ModelScreen(ClientModal[bool]):
                     inspect_model_artifact, Path(self.input("model-artifact"))
                 )
                 profile = profile.model_copy(update={"artifact": artifact})
-            from doxa.core.credential_store import save_credential
+            from doxa.core.credential_store import MANAGED_PREFIX, create_credential
             from doxa.core.secrets import configure_runtime_guard, workspace_env
             from doxa.providers.registry import validate_profile
 
-            validate_profile(profile, workspace_env(self.controller.settings.data_dir))
-            if profile.transport != "cli_session" and self.input("model-secret"):
-                assert profile.credential_env is not None
-                save_credential(
-                    self.controller.settings.data_dir,
-                    profile.credential_env,
-                    self.input("model-secret"),
-                )
-                self.query_one("#model-secret", Input).value = ""
+            directory = self.controller.settings.data_dir
+            env = await asyncio.to_thread(workspace_env, directory)
+            validate_profile(profile, env)
+            if migrate:
+                if pending or not reference or reference.startswith(MANAGED_PREFIX):
+                    raise ValueError("Choose a legacy reference and leave the new key field blank")
+                pending = env.get(reference, "")
+                if pending in {"", "replace_me"}:
+                    raise ValueError("The legacy credential is missing")
+            if pending:
+                import json
+
+                from doxa.core.secrets import safe_text
+
+                body = json.dumps([profile.model_dump(mode="json"), note])
+                if safe_text(body, extra_values=(pending,)) != body:
+                    raise ValueError("A credential must not appear in profile or model fields")
+                managed = await asyncio.to_thread(create_credential, directory, pending)
+                profile = profile.model_copy(update={"credential_env": managed})
+
             if profile.enabled and not profile.local and profile.transport != "cli_session":
                 configure_runtime_guard(
                     self.controller.settings.data_dir,
@@ -805,8 +999,14 @@ class ModelScreen(ClientModal[bool]):
             )
             self.dismiss(True)
         except ValidationError as exc:
-            fields = ", ".join(
-                ".".join(str(p) for p in e["loc"]) for e in exc.errors(include_input=False)
+            from doxa.core.secrets import safe_text
+
+            fields = safe_text(
+                ", ".join(
+                    ".".join(str(p) for p in e["loc"]) for e in exc.errors(include_input=False)
+                ),
+                directory=self.controller.settings.data_dir,
+                extra_values=(pending,),
             )
             self.query_one("#model-error", Label).update("Check field limits or format: " + fields)
         except (ValueError, KeyError, OSError) as exc:
@@ -817,7 +1017,7 @@ class ModelScreen(ClientModal[bool]):
                 )
                 self.dismiss(True)
             else:
-                from doxa.core.secrets import safe_text, secret_values
+                from doxa.core.secrets import safe_text
 
                 message = (
                     str(exc)
@@ -827,6 +1027,10 @@ class ModelScreen(ClientModal[bool]):
                         "existing files are preserved."
                     )
                 )
-                for secret in secret_values(self.controller.settings.data_dir):
-                    message = message.replace(secret, "[REDACTED]")
-                self.query_one("#model-error", Label).update(safe_text(message))
+                self.query_one("#model-error", Label).update(
+                    safe_text(
+                        message,
+                        directory=self.controller.settings.data_dir,
+                        extra_values=(pending,),
+                    )
+                )

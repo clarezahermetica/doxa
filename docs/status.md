@@ -5,6 +5,11 @@ Textual and the CLI; React Studio and the native graphical desktop are retired.
 
 ## Observed verification
 
+- **Secure model connections:** the existing terminal form can list and select local
+  models before saving. Managed API references resolve only through protected storage.
+  Reachability, declared capabilities and launch authorization remain separate. See
+  [model connections](model-connections.md) for workflow, platform and security limits.
+
 
 - **2026-11-07 v24 bounded readiness and installed update (offline):** final full suite
   **514 passed**, one pre-existing Starlette/httpx warning; Ruff and strict mypy for
