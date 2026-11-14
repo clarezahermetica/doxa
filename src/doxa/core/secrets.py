@@ -29,7 +29,7 @@ def workspace_env(directory: Path) -> dict[str, str]:
     if not explicit and not path.is_file() and directory.name == ".doxa":
         path = directory.parent / ".env"
     values = {k: v for k, v in dotenv_values(path).items() if v is not None}
-    from doxa.core.credential_store import load_credentials
+    from doxa.core.credential_store import MANAGED_PREFIX, load_credentials
 
     protected = load_credentials(directory)
     controls: dict[str, str] = {}
@@ -41,7 +41,11 @@ def workspace_env(directory: Path) -> dict[str, str]:
             for k, v in parsed.items()
             if re.fullmatch(r"DOXA_[A-Z0-9_]+_(ENABLED|ALLOWANCE_USD)", k)
         }
-    return {**protected, **values, **controls, **os.environ}
+    legacy = {**protected, **values, **controls, **os.environ}
+    return {
+        **{name: value for name, value in legacy.items() if not name.startswith(MANAGED_PREFIX)},
+        **{name: value for name, value in protected.items() if name.startswith(MANAGED_PREFIX)},
+    }
 
 
 def configure_runtime_guard(directory: Path, runtime: str, allowance: str) -> None:
@@ -210,7 +214,9 @@ def reject_secrets(
         raise ValueError("Secret-bearing data cannot be persisted or exported")
 
 
-def reject_artifact_secrets(data: bytes, directory: Path) -> None:
+def reject_artifact_secrets(
+    data: bytes, directory: Path, *, known_values: tuple[str, ...] | None = None
+) -> None:
     """Check ordinary text and bounded ZIP members, including original DOCX metadata.
 
     This is a known-credential guard, not a classifier for all sensitive documents or
@@ -219,7 +225,7 @@ def reject_artifact_secrets(data: bytes, directory: Path) -> None:
     import io
     import zipfile
 
-    values = secret_values(directory)
+    values = secret_values(directory) if known_values is None else known_values
     expanded = 0
     members = 0
 

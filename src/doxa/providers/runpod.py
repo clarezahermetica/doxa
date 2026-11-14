@@ -9,6 +9,7 @@ from uuid import UUID
 
 import httpx
 
+from doxa.core.credential_store import MANAGED_PREFIX
 from doxa.core.models import Usage
 from doxa.core.profiles import ModelProfile
 from doxa.core.secrets import safe_text
@@ -44,6 +45,10 @@ def endpoint_url(profile: ModelProfile, env: Mapping[str, str]) -> str:
     if profile.runtime == "openai_compatible" and not override:
         raise ValueError("Compatible provider requires an explicit HTTPS base URL")
     url = override or f"https://api.runpod.ai/v2/{endpoint}/openai/v1"
+    # Use the same URL interpretation for validation and dispatch. Reject
+    # control characters, backslashes and even empty userinfo before parsing.
+    if any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in url) or chr(92) in url:
+        raise ValueError("Invalid provider URL syntax")
     try:
         parsed = urlsplit(url)
         port = parsed.port
@@ -57,10 +62,10 @@ def endpoint_url(profile: ModelProfile, env: Mapping[str, str]) -> str:
             or parsed.hostname != "api.runpod.ai"
             or (
                 port is not None
-                or parsed.username
-                or parsed.password
-                or parsed.query
-                or parsed.fragment
+                or parsed.username is not None
+                or parsed.password is not None
+                or "?" in url
+                or "#" in url
                 or not re.fullmatch(r"/v2/[A-Za-z0-9_-]+/openai/v1", parsed.path)
             )
         ):
@@ -68,7 +73,7 @@ def endpoint_url(profile: ModelProfile, env: Mapping[str, str]) -> str:
     elif (
         (parsed.scheme != "https" and not (profile.local and parsed.scheme == "http"))
         or not parsed.hostname
-        or (parsed.username or parsed.password or parsed.query or parsed.fragment)
+        or (parsed.username is not None or parsed.password is not None or "?" in url or "#" in url)
     ):
         raise ValueError("Compatible endpoints require an explicit HTTPS URL without credentials")
     if (
@@ -181,7 +186,8 @@ class RunPodProvider:
         values.extend(
             secret
             for name, secret in self.env.items()
-            if name.endswith(("_KEY", "_TOKEN", "_PASSWORD", "_SECRET"))
+            if name.startswith(MANAGED_PREFIX)
+            or name.endswith(("_KEY", "_TOKEN", "_PASSWORD", "_SECRET"))
         )
         return safe_text(value, extra_values=values)
 

@@ -250,6 +250,13 @@ CONNECTIONS += tuple(
         ("copilot_cli", "GitHub Copilot CLI"),
     )
 )
+# The menu starts with keyless local servers, then sign-in, then optional API keys.
+CONNECTIONS = tuple(
+    sorted(
+        CONNECTIONS,
+        key=lambda c: (0 if c.local else 1 if c.key == "codex_cli" else 2),
+    )
+)
 CONNECTION_BY_ID = {c.key: c for c in CONNECTIONS}
 PROTOCOLS = {
     "openai_compatible": "OpenAI-compatible Chat Completions",
