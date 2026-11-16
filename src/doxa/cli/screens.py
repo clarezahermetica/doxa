@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Literal, cast
 from uuid import UUID, uuid4
 
+from pydantic import ValidationError
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -38,6 +39,10 @@ from doxa.core.workbench import (
     add_agent,
     create_experiment,
 )
+
+
+class SetupInputError(ValueError):
+    """An instruction the setup form can safely show to the user."""
 
 
 class SetupScreen(ClientModal[bool]):
@@ -140,31 +145,19 @@ class SetupScreen(ClientModal[bool]):
                             allow_blank=False,
                             id="setup-schedule",
                         )
-                        yield Input(value="2", placeholder="Rounds", id="setup-rounds")
-                        yield Input(
-                            value="1", placeholder="Concurrent calls", id="setup-concurrency"
-                        )
-                        yield Input(value="20", placeholder="Maximum model calls", id="setup-calls")
-                        yield Input(
-                            value="16384",
-                            placeholder="Per-agent token cap",
-                            id="setup-agent-tokens",
-                        )
-                        yield Input(
-                            value="65536",
-                            placeholder="Aggregate token cap",
-                            id="setup-total-tokens",
-                        )
-                        yield Input(
-                            value="120", placeholder="Run timeout seconds", id="setup-timeout"
-                        )
-                        yield Input(
-                            value="8192", placeholder="Context token cap", id="setup-context"
-                        )
-                        yield Input(value="1024", placeholder="Output token cap", id="setup-output")
-                        yield Input(
-                            value="1", placeholder="Run spending ceiling USD", id="setup-run-cap"
-                        )
+                        for field, label, default in (
+                            ("rounds", "Rounds", "2"),
+                            ("concurrency", "Concurrent calls", "1"),
+                            ("calls", "Maximum model calls", "20"),
+                            ("agent-tokens", "Per-agent token cap", "16384"),
+                            ("total-tokens", "Aggregate token cap", "65536"),
+                            ("timeout", "Run timeout (seconds)", "120"),
+                            ("context", "Context token cap", "8192"),
+                            ("output", "Output token cap", "1024"),
+                            ("run-cap", "Run spending ceiling (USD)", "1"),
+                        ):
+                            yield Label(label)
+                            yield Input(value=default, id=f"setup-{field}")
                         yield Checkbox(
                             "Structured claims / criticism / responses / model adjudication",
                             id="setup-structured",
@@ -242,7 +235,7 @@ class SetupScreen(ClientModal[bool]):
                             ],
                             id="setup-tools",
                         )
-            yield Label("", id="setup-error")
+            yield Label("", id="setup-error", markup=False)
             with Horizontal(id="setup-actions"):
                 yield Button(
                     "Save version" if self.definition else "Create",
@@ -261,20 +254,74 @@ class SetupScreen(ClientModal[bool]):
                 if self.kind == "experiment":
                     execution = self.query_one("#setup-execution", Select).value
                     if execution not in {"live", "synthetic"}:
-                        raise ValueError("Choose an execution mode explicitly")
+                        raise SetupInputError("Choose an execution mode.")
+                    if not name.strip():
+                        raise SetupInputError("Enter an experiment name.")
+                    if not text.strip():
+                        raise SetupInputError("Enter a research question.")
+                    protocol = cast(
+                        Literal["fixed_rounds", "investigation"],
+                        self.query_one("#setup-research-protocol", Select).value,
+                    )
+                    schedule = cast(
+                        Literal["sequential", "round_parallel"],
+                        self.query_one("#setup-schedule", Select).value,
+                    )
+                    structured = self.query_one("#setup-structured", Checkbox).value
+                    staged = self.query_one("#setup-staged", Checkbox).value
+                    review = self.query_one("#setup-review-disputes", Checkbox).value
+                    try:
+                        rounds = int(self.query_one("#setup-rounds", Input).value)
+                    except ValueError:
+                        raise SetupInputError("Enter a whole number for Rounds.") from None
+                    if staged and (not structured or rounds < 3):
+                        raise SetupInputError(
+                            "Staged research needs Structured claims and at least 3 rounds. "
+                            "Turn off Staged research cycle to keep your current settings."
+                        )
+                    if protocol == "investigation" and (not structured or schedule != "sequential"):
+                        raise SetupInputError(
+                            "Investigation needs Structured claims and Sequential scheduling."
+                        )
+                    if review and protocol != "investigation":
+                        raise SetupInputError(
+                            "Reviewer follow-up requires Investigation. Select it or turn off "
+                            "the reviewer follow-up checkbox."
+                        )
+                    templates = self.controller.configuration().agents
+                    if not templates:
+                        raise SetupInputError("Add an agent template before creating a run.")
+                    members = self.query_one("#setup-members", Input).value
+                    if not members.strip():
+                        raise SetupInputError("Enter at least one Council template and count.")
                     groups = []
-                    for raw in self.query_one("#setup-members", Input).value.split(";"):
-                        display, _, count = raw.strip().rpartition(":")
-                        matches = [
-                            a
-                            for a in self.controller.configuration().agents
-                            if a.display_name == display
-                        ]
-                        if len(matches) != 1:
-                            raise ValueError(
-                                "Choose a unique existing template name for each group"
+                    roles = set()
+                    for raw in members.split(";"):
+                        display, separator, count = raw.strip().rpartition(":")
+                        if not separator or not display.strip() or not count.strip().isdecimal():
+                            raise SetupInputError(
+                                "Enter each Council entry as a template name and count, "
+                                "for example Researcher:1."
+                            )
+                        matches = [a for a in templates if a.display_name == display]
+                        if not matches:
+                            matches = [
+                                a for a in templates if a.display_name.strip() == display.strip()
+                            ]
+                        if len(matches) != 1 or not matches[0].enabled:
+                            raise SetupInputError(
+                                "Each Council entry must match one enabled agent template."
                             )
                         groups.append(ParticipantGroup(agent_id=matches[0].id, count=int(count)))
+                        roles.add(matches[0].agent.role)
+                    if protocol == "investigation" and (
+                        not {Role.SKEPTIC, Role.ARCHIVIST} <= roles
+                        or not roles & {Role.RESEARCHER, Role.EXECUTOR}
+                    ):
+                        raise SetupInputError(
+                            "Investigation needs an Archivist, a Skeptic, and a Researcher or "
+                            "Executor. Check the roles on the selected templates."
+                        )
                     created = create_experiment(
                         self.controller,
                         NewExperiment(
@@ -282,21 +329,12 @@ class SetupScreen(ClientModal[bool]):
                             task=TaskSpecification(
                                 question=text,
                                 evaluation_criteria=("citation coverage", "explicit uncertainty")
-                                + (
-                                    (REVIEW_DISPUTES,)
-                                    if self.query_one("#setup-review-disputes", Checkbox).value
-                                    else ()
-                                ),
-                                research_protocol=cast(
-                                    Literal["fixed_rounds", "investigation"],
-                                    self.query_one("#setup-research-protocol", Select).value,
-                                ),
-                                staged_research=self.query_one("#setup-staged", Checkbox).value,
-                                structured_actions=self.query_one(
-                                    "#setup-structured", Checkbox
-                                ).value,
+                                + ((REVIEW_DISPUTES,) if review else ()),
+                                research_protocol=protocol,
+                                staged_research=staged,
+                                structured_actions=structured,
                                 council=CouncilLimits(
-                                    rounds=int(self.query_one("#setup-rounds", Input).value),
+                                    rounds=rounds,
                                     concurrency=int(
                                         self.query_one("#setup-concurrency", Input).value
                                     ),
@@ -310,10 +348,7 @@ class SetupScreen(ClientModal[bool]):
                                     timeout_seconds=float(
                                         self.query_one("#setup-timeout", Input).value
                                     ),
-                                    scheduling=cast(
-                                        Literal["sequential", "round_parallel"],
-                                        self.query_one("#setup-schedule", Select).value,
-                                    ),
+                                    scheduling=schedule,
                                 ),
                             ),
                             mode=ProtocolMode(str(self.query_one("#setup-protocol", Select).value)),
@@ -358,9 +393,21 @@ class SetupScreen(ClientModal[bool]):
                     )
                     add_agent(self.controller, command)
                 self.dismiss(True)
-            except (ValueError, KeyError):
+            except SetupInputError as exc:
+                self.query_one("#setup-error", Label).update(str(exc))
+            except ValidationError as exc:
+                fields = ", ".join(
+                    str(error["loc"][-1]).replace("_", " ")
+                    for error in exc.errors(include_input=False)
+                    if error["loc"]
+                )
                 self.query_one("#setup-error", Label).update(
-                    "Choose an execution mode and check fields, template names, models and limits."
+                    f"Check the value for {fields}." if fields else
+                    "Check the Council composition and the selected protocol and limits."
+                )
+            except (ValueError, KeyError, ArithmeticError):
+                self.query_one("#setup-error", Label).update(
+                    "DOXA could not save this setup. Check the model assignments and limits."
                 )
 
 

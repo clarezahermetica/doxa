@@ -198,13 +198,13 @@ def test_general_research_mode_is_explicit_and_never_converts_live(
 
 
 def test_direct_experiment_form_requires_execution_choice(controller):
-    from textual.widgets import Input, Label, Select, TextArea
+    from textual.widgets import Checkbox, Input, Label, Select, TextArea
 
     from doxa.core.models import Role
     from doxa.core.workbench import NewAgent, add_agent
 
     add_agent(
-        controller, NewAgent(display_name="Reader", role=Role.RESEARCHER, instructions="Read.")
+        controller, NewAgent(display_name="Reader ", role=Role.RESEARCHER, instructions="Read.")
     )
 
     async def interaction():
@@ -220,7 +220,17 @@ def test_direct_experiment_form_requires_execution_choice(controller):
             await click(pilot, "#setup-save")
             assert app.screen is screen and not controller.list_runs()
             assert "execution mode" in str(screen.query_one("#setup-error", Label).render())
-            await pilot.press("escape", "q")
+            screen.query_one("#setup-execution", Select).value = "synthetic"
+            screen.query_one("#setup-structured", Checkbox).value = True
+            screen.query_one("#setup-staged", Checkbox).value = True
+            await click(pilot, "#setup-save")
+            assert app.screen is screen and not controller.list_runs()
+            assert "at least 3 rounds" in str(screen.query_one("#setup-error", Label).render())
+            screen.query_one("#setup-staged", Checkbox).value = False
+            await click(pilot, "#setup-save")
+            assert len(controller.list_runs()) == 1
+            assert not controller.ledger.records("model_call")
+            await pilot.press("q")
 
     asyncio.run(interaction())
 
