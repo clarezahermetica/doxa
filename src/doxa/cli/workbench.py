@@ -286,10 +286,60 @@ def install(app: typer.Typer) -> None:
 
     @app.command("models")
     def models(
-        json_output: bool = typer.Option(False, "--json"), data_dir: Path = DEFAULT_DATA_DIR
+        json_output: bool = typer.Option(False, "--json"),
+        data_dir: Path = DEFAULT_DATA_DIR,
+        check: Annotated[str | None, typer.Option(help="Inspect a saved profile by name.")] = None,
+        authorize_network: Annotated[
+            bool, typer.Option(help="Permit one read-only HTTP metadata check with --check.")
+        ] = False,
     ) -> None:
-        """List saved model identities and runtime assignments without contacting endpoints."""
-        config = instance(data_dir).configuration()
+        """List model profiles or check one profile without inference."""
+        controller = instance(data_dir)
+        config = controller.configuration()
+        if authorize_network and check is None:
+            raise typer.BadParameter("--authorize-network requires --check PROFILE")
+        if check is not None:
+            from doxa.core.secrets import workspace_env
+            from doxa.providers.discovery import describe_connection, discover_models
+            from doxa.providers.registry import readiness
+
+            profile = next((p for p in config.profiles if p.id == check), None)
+            if profile is None:
+                raise typer.BadParameter("No saved profile by that name")
+            env = {} if profile.transport == "cli_session" else workspace_env(
+                controller.settings.data_dir
+            )
+            ready = readiness(profile, env)
+            data: dict[str, Any] = {
+                "profile": ready.model_dump(mode="json"),
+                "declared": profile.capabilities.model_dump(mode="json"),
+                "inference_verified": False,
+                "execution_authorized": False,
+                "metadata": None,
+            }
+            if authorize_network:
+                report = asyncio.run(discover_models(profile, env, authorize_network=True))
+                data["metadata"] = report.model_dump(mode="json")
+                if not json_output:
+                    typer.echo(terminal_text(describe_connection(report)))
+                    for model_id in report.model_ids:
+                        typer.echo(terminal_text(model_id))
+            if json_output:
+                typer.echo(json.dumps(data, ensure_ascii=True))
+            else:
+                credential = (
+                    "not required" if profile.authentication == "none"
+                    else "available" if ready.credential_present else "missing or unverified"
+                )
+                typer.echo(
+                    f"{profile.id} v{profile.version}: {ready.status}; credential {credential}. "
+                    f"Declared text: {profile.capabilities.text_generation}; "
+                    f"structured output: {profile.capabilities.structured_output}."
+                )
+                for issue in ready.issues:
+                    typer.echo(terminal_text(issue))
+                typer.echo("This check does not verify inference or authorize execution.")
+            return
         if json_output:
             typer.echo(json.dumps([p.model_dump(mode="json") for p in config.profiles]))
         else:

@@ -63,7 +63,8 @@ billing remains null.
 
 The provider registry accepts arbitrary model IDs through compatible trusted adapters.
 Native transports and OpenAI-compatible endpoints are documented in
-[provider support](provider-support.md). Registration, saving a profile and local
+[provider support](provider-support.md). See [model connections](model-connections.md) for
+keyless discovery and protected credential references. Registration, saving a profile and local
 readiness inspection do not establish that a connection works. Paid inference and
 external disclosure require separate authorization and durable admission before dispatch.
 Uncertain external requests are not automatically replayed or refunded.

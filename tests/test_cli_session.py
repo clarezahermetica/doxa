@@ -159,6 +159,8 @@ def test_version_auth_and_diagnostics_are_safe_and_never_infer(fake_cli):
     [
         (cli.ProcessResult(1, b"", b"Not logged in"), "missing"),
         (cli.ProcessResult(2, b"", b"opaque fixture failure"), "unknown"),
+        (cli.ProcessResult(1, b"", b"Saved ChatGPT authentication expired"), "unknown"),
+        (cli.ProcessResult(0, b"", b"Not logged in using ChatGPT"), "missing"),
         (cli.ProcessResult(0, b"Logged in using an API key", b""), "unknown"),
     ],
 )

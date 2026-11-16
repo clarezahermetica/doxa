@@ -16,6 +16,7 @@ dependencies = [
 [project.optional-dependencies]
 packaging = ["pyinstaller==6.22.3"]
 tui = ["textual==8.2.8"]
+os-credentials = ["keyring>=25.7,<26; sys_platform == 'darwin' or sys_platform == 'linux'"]
 moss = ["moss>=1.21,<2"]
 dev = ["pytest>=8,<10", "httpx>=0.28,<1", "ruff>=0.11,<1", "mypy>=1.15,<2"]
 

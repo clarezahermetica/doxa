@@ -253,7 +253,7 @@ def cli_reference() -> Iterator[ReferenceEntry]:
                     if isinstance(p, TyperOption)
                     else "Argument " + (p.name or "VALUE")
                 )
-                + f" · type: {p.type} · required: {p.required}"
+                + f" · type: {getattr(p, 'type', 'value')} · required: {p.required}"
                 + (" · " + str(getattr(p, "help", "") or ""))
                 for p in command.params
             )

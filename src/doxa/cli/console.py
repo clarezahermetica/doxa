@@ -37,6 +37,11 @@ from doxa.systems.research import branch_events
 class ResearchConsole(App[None]):
     from doxa.version import TERMINAL_BUILD
 
+    def _fatal_error(self) -> None:
+        # Textual's default fatal traceback includes live widget/handler locals.
+        # A masked credential is still plaintext in memory; do not print those frames.
+        self.panic("The terminal encountered an unexpected error and closed.")
+
     TITLE = "DOXA " + TERMINAL_BUILD + " · Research Console"
     BINDINGS = [
         Binding("q", "quit", "Quit viewer"),

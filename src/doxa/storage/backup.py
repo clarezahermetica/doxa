@@ -10,6 +10,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
+from doxa.core.secrets import _redact, reject_artifact_secrets, secret_values
 from doxa.core.workspaces import validate_workspace
 from doxa.storage.integrity import verify_workspace
 
@@ -41,6 +42,16 @@ def backup_workspace(source: Path, destination: Path) -> dict[str, Any]:
         ) as original:
             with closing(sqlite3.connect(stage / "ledger.sqlite3")) as snapshot_db:
                 original.backup(snapshot_db)
+                known_values = secret_values(source, database=snapshot_db)
+                # Older histories or artifacts can predate a credential registration.
+                for table in ("events", "configurations"):
+                    exists = snapshot_db.execute(
+                        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+                    ).fetchone()
+                    if exists:
+                        for (body,) in snapshot_db.execute(f"SELECT body FROM {table}"):
+                            if _redact(body, known_values) != body:
+                                raise ValueError("Secret-bearing history cannot be backed up")
         root = source / "artifacts"
         if root.is_symlink():
             raise ValueError("Artifact symlinks are not supported in a backup")
@@ -52,6 +63,8 @@ def backup_workspace(source: Path, destination: Path) -> dict[str, Any]:
                     target = stage / "artifacts" / path.relative_to(root)
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(path, target)
+                    # Inspect exactly the bytes that will be published by this snapshot.
+                    reject_artifact_secrets(target.read_bytes(), source, known_values=known_values)
         counts = verify_workspace(stage)
         files = {
             p.relative_to(stage).as_posix(): _digest(p) for p in stage.rglob("*") if p.is_file()

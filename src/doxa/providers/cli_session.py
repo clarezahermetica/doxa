@@ -487,7 +487,9 @@ async def check_cli(adapter: str) -> CliStatus:
         auth_text = (auth.stdout + auth.stderr).decode("utf-8", "replace").lower()
         # API-key authentication is intentionally not accepted for this transport.
         authentication: Literal["unknown", "authenticated", "missing"] = "unknown"
-        if auth.code == 0 and "logged in using chatgpt" in auth_text:
+        if auth.code == 0 and any(
+            line.strip() == "logged in using chatgpt" for line in auth_text.splitlines()
+        ):
             authentication = "authenticated"
         elif "not logged in" in auth_text:
             authentication = "missing"
@@ -501,7 +503,7 @@ async def check_cli(adapter: str) -> CliStatus:
                 "output_file": "--output-last-message" in help_text,
                 "disabled_features": tuple(f for f in DISABLED_FEATURES if f in names),
                 "login_command": "codex login" if authentication != "authenticated" else None,
-                "detail": "Ready for an explicitly authorized subscription-quota test"
+                "detail": "CLI reports ChatGPT sign-in; session freshness and generation unverified"
                 if supported and authentication == "authenticated"
                 else "Installed version lacks required safe noninteractive flags"
                 if not supported
