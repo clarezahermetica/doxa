@@ -358,14 +358,16 @@ class Controller:
         states = [r for e in events for r in e.payload if isinstance(r, RunState)]
         if states:
             run = run.model_copy(update={"status": states[-1].status})
+        return RunBundle(run=run, events=events, accounting=self.run_accounting(run_id))
+
+    def run_accounting(self, run_id: UUID) -> tuple[dict[str, str | int | None], ...]:
         from doxa.storage.budget import BudgetStore
 
-        accounting = tuple(
+        return tuple(
             op
             for op in BudgetStore(self.settings.database_path).operations()
             if op["run_id"] == str(run_id)
         )
-        return RunBundle(run=run, events=events, accounting=accounting)
 
     def cancel(self, run_id: UUID) -> RunBundle:
         from doxa.core.models import Provenance

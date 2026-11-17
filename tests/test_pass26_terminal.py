@@ -34,7 +34,11 @@ def test_guided_child_cancel_returns_to_origin(controller, tmp_path, monkeypatch
         app = ResearchConsole(controller.settings.data_dir, show_guide=True)
         async with app.run_test(size=(80, 24)) as pilot:
             await pilot.pause()
-            await click(pilot, "#guide-offline")
+            guide = pilot.app.screen
+            assert isinstance(guide, GettingStarted)
+            guide.flow, guide.step, guide.execution = "offline", 0, "synthetic"
+            guide.update_step()
+            await pilot.pause()
             await click(pilot, "#guide-next")
             guide = app.screen
             assert guide.step == 1
@@ -60,7 +64,11 @@ def test_child_save_escape_reopen_and_preferences(controller, tmp_path, monkeypa
         app = ResearchConsole(controller.settings.data_dir, show_guide=True)
         async with app.run_test(size=(80, 24)) as pilot:
             await pilot.pause()
-            await click(pilot, "#guide-offline")
+            guide = pilot.app.screen
+            assert isinstance(guide, GettingStarted)
+            guide.flow, guide.step, guide.execution = "offline", 0, "synthetic"
+            guide.update_step()
+            await pilot.pause()
             guide = app.screen
             await click(pilot, "#guide-do")
             await pilot.press("escape")
@@ -89,7 +97,11 @@ def test_child_save_escape_reopen_and_preferences(controller, tmp_path, monkeypa
             assert guide_preferences()["show_getting_started"] is True
             await click(pilot, "#guide-back")
             assert app.screen.flow is None
-            await click(pilot, "#guide-offline")
+            guide = pilot.app.screen
+            assert isinstance(guide, GettingStarted)
+            guide.flow, guide.step, guide.execution = "offline", 0, "synthetic"
+            guide.update_step()
+            await pilot.pause()
             await click(pilot, "#guide-previous")
             assert app.screen.flow is None
             await pilot.press("escape", "q")
@@ -113,7 +125,11 @@ def test_completed_selection_new_experiment_import_returns_to_intended_guide(
         app = ResearchConsole(controller.settings.data_dir, show_guide=True)
         async with app.run_test(size=(80, 24)) as pilot:
             await pilot.pause()
-            await click(pilot, "#guide-offline")
+            guide = pilot.app.screen
+            assert isinstance(guide, GettingStarted)
+            guide.flow, guide.step, guide.execution = "offline", 0, "synthetic"
+            guide.update_step()
+            await pilot.pause()
             guide = app.screen
             guide.step = 3
             guide.update_step()
@@ -198,13 +214,13 @@ def test_general_research_mode_is_explicit_and_never_converts_live(
 
 
 def test_direct_experiment_form_requires_execution_choice(controller):
-    from textual.widgets import Input, Label, Select, TextArea
+    from textual.widgets import Checkbox, Input, Label, Select, TextArea
 
     from doxa.core.models import Role
     from doxa.core.workbench import NewAgent, add_agent
 
     add_agent(
-        controller, NewAgent(display_name="Reader", role=Role.RESEARCHER, instructions="Read.")
+        controller, NewAgent(display_name="Reader ", role=Role.RESEARCHER, instructions="Read.")
     )
 
     async def interaction():
@@ -220,7 +236,17 @@ def test_direct_experiment_form_requires_execution_choice(controller):
             await click(pilot, "#setup-save")
             assert app.screen is screen and not controller.list_runs()
             assert "execution mode" in str(screen.query_one("#setup-error", Label).render())
-            await pilot.press("escape", "q")
+            screen.query_one("#setup-execution", Select).value = "synthetic"
+            screen.query_one("#setup-structured", Checkbox).value = True
+            screen.query_one("#setup-staged", Checkbox).value = True
+            await click(pilot, "#setup-save")
+            assert app.screen is screen and not controller.list_runs()
+            assert "at least 3 rounds" in str(screen.query_one("#setup-error", Label).render())
+            screen.query_one("#setup-staged", Checkbox).value = False
+            await click(pilot, "#setup-save")
+            assert len(controller.list_runs()) == 1
+            assert not controller.ledger.records("model_call")
+            await pilot.press("q")
 
     asyncio.run(interaction())
 
@@ -260,7 +286,11 @@ def test_agent_labels_keyboard_defaults_and_persisted_permissions(
         app = ResearchConsole(controller.settings.data_dir, show_guide=True)
         async with app.run_test(size=size) as pilot:
             await pilot.pause()
-            await click(pilot, "#guide-offline")
+            guide = pilot.app.screen
+            assert isinstance(guide, GettingStarted)
+            guide.flow, guide.step, guide.execution = "offline", 0, "synthetic"
+            guide.update_step()
+            await pilot.pause()
             await click(pilot, "#guide-next")
             guide = app.screen
             await click(pilot, "#guide-do")
@@ -347,7 +377,11 @@ def test_existing_research_picker_and_nested_help_return(controller, tmp_path, m
             assert isinstance(app.screen, ExperimentPicker)
             await pilot.press("escape")
             assert app.screen is guide and guide.flow is None
-            await click(pilot, "#guide-offline")
+            guide = pilot.app.screen
+            assert isinstance(guide, GettingStarted)
+            guide.flow, guide.step, guide.execution = "offline", 0, "synthetic"
+            guide.update_step()
+            await pilot.pause()
             await click(pilot, "#guide-next")
             await click(pilot, "#guide-do")
             form = app.screen

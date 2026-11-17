@@ -17,6 +17,7 @@ from doxa.core.models import (
     ClaimAssessment,
     Decision,
     Evaluation,
+    Event,
     EventType,
     ResearchOutcome,
     Role,
@@ -82,8 +83,12 @@ class ClaimThread:
 
 
 def claim_threads(controller: "Controller", run_id: UUID, branch: UUID) -> list[ClaimThread]:
+    return claim_threads_from_events(controller.ledger.events(run_id), branch)
+
+
+def claim_threads_from_events(events: list[Event], branch: UUID) -> list[ClaimThread]:
     records = [
-        p for e in branch_events(controller.ledger.events(run_id), branch) for p in e.payload
+        p for e in branch_events(events, branch) for p in e.payload
     ]
     claims = [p for p in records if isinstance(p, Claim)]
     groups: dict[UUID, list[Claim]] = {}
@@ -393,11 +398,17 @@ async def execute_investigation(
     except Exhausted as exc:
         conclude("stopped", "unresolved", str(exc))
     except ValueError as exc:
+        from doxa.core.action_normalization import ResearchReplyError
+
         if str(exc).startswith("Context budget"):
             conclude("stopped", "unresolved", str(exc))
         else:
             conclude(
-                "failed", "unresolved", "invalid_research_operation; inspect persisted diagnostics"
+                "failed",
+                "unresolved",
+                f"{exc.category}:{exc.code}"
+                if isinstance(exc, ResearchReplyError)
+                else "invalid_research_operation; inspect persisted diagnostics",
             )
             raise
     except TimeoutError:
@@ -406,7 +417,10 @@ async def execute_investigation(
         conclude("interrupted", "unresolved", "cancelled_no_automatic_replay")
         raise
     except Exception as exc:
+        from doxa.core.workbench import debate_failure_reason
+
         if runtime.controller.inspect(runtime.run.id).run.status == "running":
-            conclude("failed", "unresolved", type(exc).__name__ + ": inspect persisted diagnostics")
+            reason = debate_failure_reason(exc)
+            conclude("failed", "unresolved", reason)
         raise
     return runtime.controller.inspect(runtime.run.id)

@@ -9,13 +9,13 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / "src"))
-from doxa.version import TERMINAL_BUILD, VERSION  # noqa: E402
+from doxa.version import ARCHIVE_NAME, DISPLAY_VERSION, TERMINAL_BUILD, VERSION  # noqa: E402
 
 build = sys.argv[1] if len(sys.argv) > 1 else TERMINAL_BUILD
 if build != TERMINAL_BUILD:
     raise ValueError("Build directory must match the shared terminal build identity")
 folder = root / "dist" / f"DOXA-Terminal-{build}"
-archive = root / "dist" / f"DOXA-Terminal-{build}-Windows.zip"
+archive = root / "dist" / ARCHIVE_NAME
 if archive.exists():
     raise FileExistsError("Existing distributions are never replaced")
 for name in ("Install-DOXA.ps1", "Uninstall-DOXA.ps1", "DOXA-InstallCommon.ps1"):
@@ -47,6 +47,7 @@ for path in sorted(folder.rglob("*")):
             "application": "DOXA",
             "format": 1,
             "version": VERSION,
+            "display_name": DISPLAY_VERSION,
             "build": build,
             "files": files,
         },

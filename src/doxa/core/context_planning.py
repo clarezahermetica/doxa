@@ -21,6 +21,10 @@ def input_size(messages: tuple[ModelMessage, ...], schema: dict[str, Any] | None
     return envelope + len(json.dumps(schema or {}).encode())
 
 
+class ContextBudgetExceeded(ValueError):
+    """The next request cannot fit within its authorized bounds."""
+
+
 @dataclass(frozen=True)
 class ContextBudget:
     context: int
@@ -51,7 +55,7 @@ class ContextBudget:
 
     def require(self, system: str, user: str, component: str) -> None:
         if not self.fits(system, user):
-            raise ValueError(
+            raise ContextBudgetExceeded(
                 f"Context budget cannot fit {component}: "
                 f"serialized_input={self.measure(system, user)}, "
                 f"schema={len(json.dumps(self.schema or {}).encode())}, "

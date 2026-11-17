@@ -7,8 +7,9 @@ from textual.containers import VerticalScroll
 from textual.widgets import Button, Input, Label, TextArea
 
 from doxa.cli.navigation import ClientModal
+from doxa.cli.turn_evidence import evidence_summary
 from doxa.core.controller import Controller
-from doxa.core.models import ArtifactRef, ModelCall
+from doxa.core.models import ArtifactRef, ContextManifest, ModelCall
 from doxa.storage.artifacts import ArtifactStore
 
 
@@ -80,6 +81,8 @@ def record_summary(record: Any) -> tuple[str, str]:
 def describe_record(controller: Controller, record: Any) -> str:
     label, state = record_summary(record)
     lines = [label, state, ""]
+    if isinstance(record, ContextManifest):
+        lines.extend((evidence_summary(record), "", "Saved input follows:"))
     values = record.model_dump(mode="json")
     for name in (
         "adapter",
@@ -121,6 +124,13 @@ def describe_record(controller: Controller, record: Any) -> str:
         "billing_uncertain",
         "completion_state",
         "request_settings",
+        "disposition",
+        "reason_code",
+        "transforms",
+        "normalizer_version",
+        "input_sha256",
+        "context_id",
+        "model_call_id",
         "usage",
     ):
         if values.get(name) is not None:
@@ -128,16 +138,21 @@ def describe_record(controller: Controller, record: Any) -> str:
     for name in ("content", "messages", "workspace"):
         artifact = getattr(record, name, None)
         if isinstance(artifact, ArtifactRef):
-            raw = ArtifactStore(controller.settings.data_dir / "artifacts").get(artifact)
+            store = ArtifactStore(controller.settings.data_dir / "artifacts")
             if name == "messages":
                 import json
 
-                messages = json.loads(raw)
-                lines += [f"\n{m['role']}:\n{m['content']}" for m in messages]
-            elif artifact.media_type.startswith("text/"):
-                lines.append(raw.decode("utf-8")[:200000])
+                try:
+                    messages = json.loads(store.get(artifact))
+                    lines += [f"\n{m['role']}:\n{m['content']}" for m in messages]
+                except (OSError, ValueError, TypeError, KeyError):
+                    lines.append("Saved prompt unavailable; the text sent cannot be verified.")
             else:
-                lines.append(f"{name}: {artifact.media_type} · SHA-256 {artifact.sha256}")
+                raw = store.get(artifact)
+                if artifact.media_type.startswith("text/"):
+                    lines.append(raw.decode("utf-8")[:200000])
+                else:
+                    lines.append(f"{name}: {artifact.media_type} · SHA-256 {artifact.sha256}")
     for identity in getattr(record, "evidence_ids", ()):
         evidence = controller.ledger.get(identity)
         lines.append(f"\nEvidence: {getattr(evidence, 'description', '')}")

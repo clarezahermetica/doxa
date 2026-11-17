@@ -24,9 +24,10 @@ def test_version_is_available_without_opening_the_console(monkeypatch):
         lambda self: (_ for _ in ()).throw(AssertionError("Version must not open the viewer")),
     )
     result = CliRunner().invoke(app, ["--version"])
-    from doxa.version import TERMINAL_BUILD
+    from doxa.version import DISPLAY_VERSION, TERMINAL_BUILD
 
-    assert result.exit_code == 0 and TERMINAL_BUILD in result.stdout
+    assert result.exit_code == 0 and result.stdout.strip() == DISPLAY_VERSION
+    assert TERMINAL_BUILD not in result.stdout
 
 
 def test_publication_metadata_and_help_expose_only_terminal_clients():

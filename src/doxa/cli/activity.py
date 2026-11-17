@@ -134,6 +134,10 @@ def operations(events: list[Event], experiment: Experiment, query: str = "") -> 
             )
             if p.kind == "evaluation":
                 text = "Evaluation recorded; inspect provenance and denominators"
+            if p.kind == "response_normalization":
+                text = "Research reply: " + p.disposition.replace("_", " ")
+                if p.transforms or p.disposition != "accepted":
+                    text += " (" + ", ".join((*p.transforms, p.reason_code)) + ")"
             if p.kind == "council_message":
                 from doxa.cli.inspectors import readable_message
 

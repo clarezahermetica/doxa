@@ -8,7 +8,9 @@ if (-not $Version) {
     }
 }
 $buildPath = Join-Path 'dist' "DOXA-Terminal-$Version"
-$archivePath = Join-Path 'dist' "DOXA-Terminal-$Version-Windows.zip"
+$archiveName = & .\.venv\Scripts\python.exe -c 'from doxa.version import ARCHIVE_NAME; print(ARCHIVE_NAME)'
+if ($LASTEXITCODE -ne 0) { throw 'Cannot read canonical archive identity.' }
+$archivePath = Join-Path 'dist' $archiveName
 if ((Test-Path -LiteralPath $buildPath) -or (Test-Path -LiteralPath $archivePath)) {
     throw 'Choose a new build version; existing portable artifacts are preserved.'
 }

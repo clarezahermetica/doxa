@@ -27,22 +27,23 @@ from textual.widgets import (
 )
 
 from doxa.cli.activity import Operation, OperationDetails, operations, worker_observation
+from doxa.cli.live_council import HELP as COUNCIL_HELP
+from doxa.cli.live_council import FeedScroll, LiveCouncil
 from doxa.cli.reference import ACTIONS
 from doxa.core.config import Settings
 from doxa.core.controller import Controller, RunBundle
-from doxa.core.models import Claim, Evaluation, Experiment, ModelCall, Trajectory
+from doxa.core.models import Claim, Evaluation, Event, Experiment, ModelCall, Trajectory
 from doxa.systems.research import branch_events
+from doxa.version import DISPLAY_VERSION
 
 
 class ResearchConsole(App[None]):
-    from doxa.version import TERMINAL_BUILD
-
     def _fatal_error(self) -> None:
         # Textual's default fatal traceback includes live widget/handler locals.
         # A masked credential is still plaintext in memory; do not print those frames.
         self.panic("The terminal encountered an unexpected error and closed.")
 
-    TITLE = "DOXA " + TERMINAL_BUILD + " · Research Console"
+    TITLE = DISPLAY_VERSION + " · Research Console"
     BINDINGS = [
         Binding("q", "quit", "Quit viewer"),
         Binding("r", "refresh", "Refresh ledger", show=False),
@@ -58,9 +59,12 @@ class ResearchConsole(App[None]):
         Binding("f1", "help", "Help", priority=True),
         Binding("f2", "details", "Expand record", show=False),
         Binding("ctrl+j", "raw", "Raw record", show=False),
+        Binding("ctrl+g", "council_focus", "Return to Council feed", show=False),
     ]
     CSS = """
     #runs { height: 5; }
+    Screen.-council-view #runs { height: 3; }
+    Screen.-council-view #tools { display: none; }
     #filter-bar { height: 3; }
     #record-kind, #filter { width: 1fr; }
     #notice { height: 2; }
@@ -134,6 +138,8 @@ class ResearchConsole(App[None]):
         self.record_map: dict[str, Any] = {}
         self.view_signature: object = None
         self.selected: UUID | None = None
+        self.council_default_for: UUID | None = None
+        self.council_previous = "activity"
         self.branch_id: UUID | None = None
         self.branch_options: tuple[UUID, ...] = ()
         self.cursor = 0
@@ -167,6 +173,8 @@ class ResearchConsole(App[None]):
             yield Select([], prompt="Actions for this workspace", id="action-menu")
             yield Button("Open", id="action-open", disabled=True)
         with TabbedContent(initial="activity"):
+            with TabPane("Live Council", id="council"):
+                yield LiveCouncil()
             with TabPane("Activity", id="activity"):
                 with Horizontal(id="activity-controls"):
                     yield Input(placeholder="Search complete branch history…", id="activity-search")
@@ -219,7 +227,7 @@ class ResearchConsole(App[None]):
         if self.appearance_error:
             self.notify(self.appearance_error, severity="warning")
         self.run_column_keys = self.query_one("#runs", DataTable).add_columns(
-            "Experiment", "State", "Kind"
+            "Experiment", "State", "Kind", "Attempt", "Created (UTC)"
         )
         self.render_activity()
         self.query_one("#claim-threads", DataTable).add_columns(
@@ -245,13 +253,24 @@ class ResearchConsole(App[None]):
                 + str(self.controller.settings.data_dir.resolve())
             )
         self.run_ids = tuple(r.id for r in runs)
+        timestamps = self.controller.ledger.attempt_timestamps()
         table = self.query_one("#runs", DataTable)
         table.clear()
+        experiments: dict[UUID, Experiment] = {}
         for run in runs:
-            exp = self.controller.ledger.get(run.experiment_id)
-            assert isinstance(exp, Experiment)
-            assert isinstance(exp, Experiment)
-            table.add_row(Text(exp.name), run.status, run.execution_kind, key=str(run.id))
+            if run.experiment_id not in experiments:
+                record = self.controller.ledger.get(run.experiment_id)
+                assert isinstance(record, Experiment)
+                experiments[run.experiment_id] = record
+            exp = experiments[run.experiment_id]
+            table.add_row(
+                Text(exp.name[:46]),
+                run.status,
+                run.execution_kind,
+                str(run.id)[:8],
+                timestamps.get(str(run.id), "unknown")[:16].replace("T", " "),
+                key=str(run.id),
+            )
         if self.selected is None and runs:
             self.selected = runs[-1].id
         if self.selected in self.run_ids:
@@ -264,12 +283,28 @@ class ResearchConsole(App[None]):
             thread = self.claim_threads.get(str(event.row_key.value))
             if thread and self.current_bundle:
                 from doxa.cli.research_view import ThreadScreen
+                from doxa.core.quality_labels import human_correction_labels
 
                 exp = self.controller.ledger.get(self.current_bundle.run.experiment_id)
                 assert isinstance(exp, Experiment)
                 self.push_screen(
                     ThreadScreen(
-                        self.controller, thread, {a.id: a.display_name for a in exp.agents}
+                        self.controller,
+                        thread,
+                        {a.id: a.display_name for a in exp.agents},
+                        set(
+                            human_correction_labels(
+                                [
+                                    p
+                                    for e in branch_events(
+                                        list(self.current_bundle.events), self.branch_id
+                                    )
+                                    for p in e.payload
+                                ]
+                            )
+                        )
+                        if self.branch_id
+                        else None,
                     )
                 )
             return
@@ -313,7 +348,15 @@ class ResearchConsole(App[None]):
         try:
             if selected is None:
                 return
-            bundle = await asyncio.to_thread(controller.inspect, selected)
+            cached = self.current_bundle
+            head = await asyncio.to_thread(controller.ledger.latest_event_id, selected)
+            if cached and cached.run.id == selected and cached.events[-1].id == head:
+                # Reservations can change while inference is outstanding, before an event
+                # is committed. Reuse immutable events, not mutable accounting.
+                accounting = await asyncio.to_thread(controller.run_accounting, selected)
+                bundle = cached.model_copy(update={"accounting": accounting})
+            else:
+                bundle = await asyncio.to_thread(controller.inspect, selected)
             observation = (
                 await asyncio.to_thread(worker_observation, controller.settings.data_dir, selected)
                 if bundle.run.status == "running"
@@ -323,7 +366,10 @@ class ResearchConsole(App[None]):
             query = self.query_one("#activity-search", Input).value
             signature = (selected, branch, len(bundle.events), query)
             projected = None
-            if signature != self.activity_signature:
+            if (
+                signature != self.activity_signature
+                and self.query_one(TabbedContent).active == "activity"
+            ):
 
                 def project() -> list[Operation]:
                     exp = controller.ledger.get(bundle.run.experiment_id)
@@ -347,8 +393,8 @@ class ResearchConsole(App[None]):
                 if projected is not None:
                     self.activity_rows = projected
                     self.activity_signature = signature
-                    self.render_activity()
-                self.apply_bundle(bundle)
+                exp, events = self.apply_bundle(bundle)
+                await self.load_council(bundle, exp, events)
                 if projected is not None:
                     self.render_activity()
         except (ValueError, KeyError, OSError):
@@ -359,7 +405,47 @@ class ResearchConsole(App[None]):
         finally:
             self._loading = False
 
-    def apply_bundle(self, bundle: RunBundle) -> None:
+    async def load_council(self, bundle: RunBundle, exp: Experiment, events: list[Event]) -> None:
+        if self.branch_id is None:
+            return
+        council = self.query_one(LiveCouncil)
+        if self.council_default_for != bundle.run.id:
+            self.council_default_for = bundle.run.id
+            if (
+                exp.task
+                and len(exp.agents) > 1
+                and (bundle.run.execution_kind == "live" or bundle.run.status == "running")
+            ):
+                self.query_one(TabbedContent).active = "council"
+                council.query_one(FeedScroll).focus()
+        if self.query_one(TabbedContent).active != "council":
+            return
+        calls = {p.call_id: p for e in events for p in e.payload if isinstance(p, ModelCall)}
+        active = next((p for p in calls.values() if p.status == "started"), None)
+        detail = f"{sum(p.status == 'completed' for p in calls.values())} calls complete"
+        if active and bundle.run.status == "running":
+            name = next((a.display_name for a in exp.agents if a.id == active.agent_id), "Unknown")
+            detail = f"{name} · recorded call started"
+        status = f"{self.state_label()} · {bundle.run.execution_kind}"
+        if self.branch_id != bundle.events[0].trajectory_id:
+            status = "Branch view · run " + status
+        await council.load(self.controller, self.branch_id, events, exp, status, detail)
+
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        council_active = event.pane.id == "council"
+        main = self.screen_stack[0]
+        if council_active or main.has_class("-council-view"):
+            main.set_class(council_active, "-council-view")
+            self.query_one("#notice", Static).styles.height = 1 if council_active else 3
+            self.query_one("#runs", DataTable).styles.height = (
+                3 if council_active or self.size.height < 30 else 5
+            )
+        if not council_active:
+            self.council_previous = event.pane.id or "activity"
+        if event.pane.id in {"activity", "council"}:
+            self.poll()
+
+    def apply_bundle(self, bundle: RunBundle) -> tuple[Experiment, list[Event]]:
         branches = [p for e in bundle.events for p in e.payload if isinstance(p, Trajectory)]
         if self.branch_id is None:
             self.branch_id = next(p.id for p in branches if p.parent_id is None)
@@ -404,22 +490,28 @@ class ResearchConsole(App[None]):
         exp = self.controller.ledger.get(bundle.run.experiment_id)
         assert isinstance(exp, Experiment)
         notice = self.query_one("#notice", Static)
-        notice.styles.height = 3
+        in_council = self.query_one(TabbedContent).active == "council"
+        notice.styles.height = 1 if in_council else 3
         name = str(getattr(exp, "name", "Experiment"))
         limit = max(18, self.size.width - 20)
         name = name[: limit - 1] + "…" if len(name) > limit else name
+        heading = f"{name} · {bundle.run.execution_kind}"
         notice.update(
-            f"{name} · {bundle.run.execution_kind}\n"
-            f"{self.state_label()}{self.sync_status()}\n"
-            f"{self.controller.settings.data_dir.resolve()}"
+            heading
+            if in_council
+            else (
+                f"{heading}\n{self.state_label()}{self.sync_status()}\n"
+                f"{self.controller.settings.data_dir.resolve()}"
+            )
         )
         self.render_research_status(bundle)
         self.update_actions()
+        return exp, events
 
     def render_research_status(self, bundle: RunBundle) -> None:
         from datetime import UTC, datetime
 
-        from doxa.core.investigation import claim_threads
+        from doxa.core.investigation import claim_threads_from_events
         from doxa.core.models import EventType, ResearchOutcome
 
         exp = self.controller.ledger.get(bundle.run.experiment_id)
@@ -479,9 +571,7 @@ class ResearchConsole(App[None]):
         notice = self.query_one("#notice", Static)
         notice.styles.height = 4 if self.size.height >= 30 else 3
         width = max(40, self.size.width)
-        identity = (
-            str(bundle.run.experiment_id) if width >= 100 else str(bundle.run.experiment_id)[:8]
-        )
+        identity = str(bundle.run.id) if width >= 100 else str(bundle.run.id)[:8]
         title_space = max(12, width - len(identity) - len(bundle.run.execution_kind) - 8)
         title = exp.name[:title_space]
         short_state = status[: max(12, width - 50)]
@@ -505,13 +595,13 @@ class ResearchConsole(App[None]):
             self.thread_signature = signature
             self.claim_threads = {
                 str(t.current.id): t
-                for t in claim_threads(self.controller, bundle.run.id, self.branch_id)
+                for t in claim_threads_from_events(list(bundle.events), self.branch_id)
             }
             table = self.query_one("#claim-threads", DataTable)
             table.clear()
             for key, thread in self.claim_threads.items():
                 table.add_row(
-                    Text(thread.current.proposition),
+                    Text(thread.current.proposition[: max(22, self.size.width - 40)]),
                     Text(thread.position),
                     f"{len(thread.criticisms)} / {len(thread.responses)}",
                     key=key,
@@ -562,6 +652,15 @@ class ResearchConsole(App[None]):
     def action_exchanges(self) -> None:
         self.query_one(TabbedContent).active = "exchanges"
         self.query_one("#claim-threads", DataTable).focus()
+
+    def action_live_council(self) -> None:
+        if self.selected is not None:
+            self.query_one(TabbedContent).active = "council"
+            self.query_one(FeedScroll).focus()
+            self.poll()
+
+    def leave_council(self) -> None:
+        self.query_one(TabbedContent).active = self.council_previous
 
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "action-menu":
@@ -765,6 +864,8 @@ class ResearchConsole(App[None]):
             self.cursor = 0
             self.view_signature = None
             self.query_one("#timeline", RichLog).clear()
+            self.query_one(TabbedContent).active = "activity"
+            self.call_after_refresh(self.query_one(LiveCouncil).clear_run)
             self.action_refresh()
         except (OSError, ValueError):
             self.notify(
@@ -774,13 +875,38 @@ class ResearchConsole(App[None]):
     def action_help(self) -> None:
         from doxa.cli.reference import CommandReference
 
+        if (
+            self.screen is self.screen_stack[0]
+            and self.query_one(TabbedContent).active == "council"
+        ):
+            from doxa.cli.inspectors import DetailScreen
+
+            self.push_screen(DetailScreen("Live Council help", COUNCIL_HELP))
+            return
+
         if isinstance(self.screen, CommandReference):
             self.screen.query_one("#reference-search", Input).focus()
             return
         self.push_screen(CommandReference(self), self.dispatch_action)
 
+    def action_about(self) -> None:
+        from doxa.cli.inspectors import DetailScreen
+
+        self.push_screen(
+            DetailScreen(
+                DISPLAY_VERSION,
+                "An unfinished, local-first research workbench. Model judgments do not "
+                "establish objective correctness.\n\n"
+                "Use Runtime and launcher for diagnostic build and installation details.",
+            )
+        )
+
     def action_raw(self) -> None:
         from doxa.cli.inspectors import DetailScreen
+
+        if self.query_one(TabbedContent).active == "council":
+            self.query_one(LiveCouncil).raw()
+            return
 
         if self.query_one(TabbedContent).active == "activity" and self.selected_operation:
             self.push_screen(OperationDetails(self.selected_operation, self.controller, raw=True))
@@ -876,6 +1002,23 @@ class ResearchConsole(App[None]):
         if self.selected:
             self.push_screen(ResearchToolScreen(self.controller, "compare", self.selected))
 
+    def action_run_summary(self) -> None:
+        from doxa.cli.inspectors import DetailScreen
+        from doxa.core.run_overview import run_overview
+
+        if self.selected:
+            self.push_screen(
+                DetailScreen(
+                    "Run summary and coverage",
+                    run_overview(self.controller, self.selected, self.branch_id),
+                )
+            )
+
+    def action_council_focus(self) -> None:
+        """Return from workspace controls; never dismiss a modal or edit its input."""
+        if len(self.screen_stack) == 1 and self.query_one(TabbedContent).active == "council":
+            self.query_one(LiveCouncil).close_inspector()
+
     def action_memory(self) -> None:
         reason = self.unavailable_reason("memory")
         if reason:
@@ -922,13 +1065,15 @@ class ResearchConsole(App[None]):
         return state
 
     def unavailable_reason(self, action: str) -> str:
-        if action in {"workspace", "help", "guide", "runtime_info"}:
+        if action in {"workspace", "help", "guide", "runtime_info", "about"}:
             return ""
         if not self.ready:
             return "Open or create a workspace first"
         if action in {"new", "agent", "model", "inspect", "connection"}:
             return ""
         if action == "details":
+            if self.query_one(TabbedContent).active == "council":
+                return "" if self.query_one(LiveCouncil).row() else "Select a contribution first"
             return (
                 ""
                 if self.selected_record is not None or self.selected_operation is not None
@@ -1148,6 +1293,9 @@ Exact accounting (unknown is null):
                 )
 
     def action_details(self) -> None:
+        if self.query_one(TabbedContent).active == "council":
+            self.query_one(LiveCouncil).inspect()
+            return
         if self.query_one(TabbedContent).active == "activity" and self.selected_operation:
             self.push_screen(OperationDetails(self.selected_operation, self.controller))
             return
@@ -1164,7 +1312,8 @@ Exact accounting (unknown is null):
         if self.query("#activity-inspector"):
             self.query_one("#activity-inspector").display = event.size.width >= 100
         if self.query("#runs"):
-            self.query_one("#runs", DataTable).styles.height = 3 if event.size.height < 30 else 5
+            compact = self.screen_stack[0].has_class("-council-view") or event.size.height < 30
+            self.query_one("#runs", DataTable).styles.height = 3 if compact else 5
         if (
             self.query("#activity-count")
             and self.query_one("#activity-operations", DataTable).is_mounted

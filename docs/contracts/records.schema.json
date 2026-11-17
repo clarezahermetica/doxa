@@ -988,6 +988,22 @@
           "title": "Source Ids",
           "type": "array"
         },
+        "source_passages": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SourcePassage"
+          },
+          "title": "Source Passages",
+          "type": "array"
+        },
+        "required_passages": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PassageAvailability"
+          },
+          "title": "Required Passages",
+          "type": "array"
+        },
         "memory_ids": {
           "default": [],
           "items": {
@@ -2084,6 +2100,46 @@
       "title": "ModelCall",
       "type": "object"
     },
+    "PassageAvailability": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "passage": {
+          "$ref": "#/$defs/SourcePassage"
+        },
+        "challenge_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Challenge Ids",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "supplied",
+            "omitted_budget",
+            "source_absent",
+            "source_ineligible",
+            "passage_unavailable"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "passage",
+        "challenge_ids",
+        "status"
+      ],
+      "title": "PassageAvailability",
+      "type": "object"
+    },
     "Permissions": {
       "additionalProperties": false,
       "properties": {
@@ -2534,6 +2590,126 @@
       "title": "ResearchOutcome",
       "type": "object"
     },
+    "ResponseNormalization": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "experiment_id": {
+          "format": "uuid",
+          "title": "Experiment Id",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "trajectory_id": {
+          "format": "uuid",
+          "title": "Trajectory Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "kind": {
+          "const": "response_normalization",
+          "default": "response_normalization",
+          "title": "Kind",
+          "type": "string"
+        },
+        "normalizer_version": {
+          "title": "Normalizer Version",
+          "type": "string"
+        },
+        "agent_id": {
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "context_id": {
+          "format": "uuid",
+          "title": "Context Id",
+          "type": "string"
+        },
+        "model_call_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Call Id"
+        },
+        "input_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Input Sha256",
+          "type": "string"
+        },
+        "execution_kind": {
+          "enum": [
+            "live",
+            "synthetic"
+          ],
+          "title": "Execution Kind",
+          "type": "string"
+        },
+        "disposition": {
+          "enum": [
+            "accepted",
+            "format_rejected",
+            "action_rejected"
+          ],
+          "title": "Disposition",
+          "type": "string"
+        },
+        "transforms": {
+          "default": [],
+          "items": {
+            "enum": [
+              "json_fence",
+              "singleton_operations"
+            ],
+            "type": "string"
+          },
+          "title": "Transforms",
+          "type": "array"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "experiment_id",
+        "run_id",
+        "trajectory_id",
+        "provenance",
+        "normalizer_version",
+        "agent_id",
+        "context_id",
+        "input_sha256",
+        "execution_kind",
+        "disposition",
+        "reason_code"
+      ],
+      "title": "ResponseNormalization",
+      "type": "object"
+    },
     "RetrievalAudit": {
       "additionalProperties": false,
       "properties": {
@@ -2945,6 +3121,39 @@
         "content"
       ],
       "title": "SourceDocument",
+      "type": "object"
+    },
+    "SourcePassage": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "source_id": {
+          "format": "uuid",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        },
+        "end": {
+          "exclusiveMinimum": 0,
+          "title": "End",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source_id",
+        "start",
+        "end"
+      ],
+      "title": "SourcePassage",
       "type": "object"
     },
     "TaskSpecification": {
@@ -3608,6 +3817,7 @@
       "provider_activity": "#/$defs/ProviderActivity",
       "reflection_decision": "#/$defs/ReflectionDecision",
       "research_outcome": "#/$defs/ResearchOutcome",
+      "response_normalization": "#/$defs/ResponseNormalization",
       "retrieval_audit": "#/$defs/RetrievalAudit",
       "run": "#/$defs/Run",
       "run_state": "#/$defs/RunState",
@@ -3640,6 +3850,9 @@
     },
     {
       "$ref": "#/$defs/ClaimAssessment"
+    },
+    {
+      "$ref": "#/$defs/ResponseNormalization"
     },
     {
       "$ref": "#/$defs/ResearchOutcome"

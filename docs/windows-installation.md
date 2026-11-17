@@ -6,6 +6,19 @@ verified internal Windows builds; old archives are not automatically updated by 
 
 ## Internal terminal builds
 
+The product version is **DOXA 0.1.0 Alpha 1** (`0.1.0a1`).
+`src/doxa/version.py` is authoritative for package metadata, CLI/help, the terminal
+title, Windows executable metadata and the portable archive name. The current
+archive is `DOXA-0.1.0a1-Windows.zip`; it is a local review artifact, not a published
+release. Numeric `vNN` identifiers remain diagnostic build identities.
+
+Installer compatibility deliberately retains `bin/doxa.cmd` and
+`versions/<internal-build>/DOXA/doxa.exe`. Do not rename these directories to the
+public label: existing installer ownership, rollback and launcher diagnostics use
+the internal build key. Workspace and credential paths are independent of both
+the public version and the executable directory. Existing packages and versions
+are preserved, including their historical labels.
+
 Build on Windows with the appropriate Python environment. `requirements-terminal.lock`
 records the internal Windows/Python 3.14.7 packaging environment, including optional Moss
 and PyInstaller dependencies. It is not a cross-platform runtime lock. The source package

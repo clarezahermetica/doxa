@@ -31,9 +31,11 @@ from doxa.core.models import (
     ModelCall,
     Provenance,
     Record,
+    ResponseNormalization,
     Role,
     ScopedRecord,
     SourceDocument,
+    SourcePassage,
     Trajectory,
     Usage,
 )
@@ -51,6 +53,9 @@ class ReviewBase(Contract):
     reviewer_id: str = Field(default="local-operator", min_length=1, max_length=100)
 
 
+CitationRanges = Annotated[tuple[SourcePassage, ...], Field(max_length=16)]
+
+
 class ReviewClaim(ReviewBase):
     operation: Literal["claim"] = "claim"
     author_id: UUID
@@ -59,6 +64,7 @@ class ReviewClaim(ReviewBase):
     source_ids: tuple[UUID, ...] = ()
     dependency_ids: tuple[UUID, ...] = ()
     citation_spans: dict[UUID, tuple[int, int]] = Field(default_factory=dict)
+    citation_ranges: CitationRanges = ()
 
 
 class ReviewChallenge(ReviewBase):
@@ -71,6 +77,7 @@ class ReviewChallenge(ReviewBase):
         "unspecified"
     )
     requested_correction: str | None = Field(default=None, min_length=1, max_length=2000)
+    citation_ranges: CitationRanges = ()
 
 
 class ReviewResponse(ReviewBase):
@@ -82,6 +89,7 @@ class ReviewResponse(ReviewBase):
     response: Literal["accept", "reject", "qualify", "investigate", "defer"]
     reason: str = Field(min_length=1, max_length=4000)
     revised_proposition: str | None = Field(default=None, min_length=1, max_length=4000)
+    citation_ranges: CitationRanges = ()
 
 
 class ReviewAssessment(ReviewBase):
@@ -92,6 +100,7 @@ class ReviewAssessment(ReviewBase):
     stance: Literal["accept", "dispute", "withdraw", "insufficient_evidence"]
     reason: str = Field(min_length=1, max_length=4000)
     source_ids: tuple[UUID, ...] = ()
+    citation_ranges: CitationRanges = ()
 
 
 class ReviewDecision(ReviewBase):
@@ -102,6 +111,7 @@ class ReviewDecision(ReviewBase):
     source_ids: tuple[UUID, ...] = ()
     outcome: Literal["retain", "qualify", "revise", "investigate", "abstain", "reject"]
     reason: str = Field(min_length=1, max_length=4000)
+    citation_ranges: CitationRanges = ()
 
 
 class ReviewAnnotation(ReviewBase):
@@ -150,6 +160,22 @@ class TextSnapshot(Contract):
     task: ArtifactRef
     external_effects_restorable: Literal[False] = False
     continuation: Literal["human_analysis_only"] = "human_analysis_only"
+
+
+def citation_ranges(command: ReviewCommand) -> tuple[SourcePassage, ...]:
+    ranges: tuple[SourcePassage, ...] = getattr(command, "citation_ranges", ())
+    if isinstance(command, ReviewClaim):
+        ranges += tuple(
+            SourcePassage(source_id=source, start=offsets[0], end=offsets[1])
+            for source, offsets in command.citation_spans.items()
+        )
+    return tuple({(r.source_id, r.start, r.end): r for r in ranges}.values())
+
+
+def review_digest(command: ReviewCommand) -> str:
+    # Empty additive fields must not change fingerprints of historical commands.
+    ignored = {"citation_ranges"} if not getattr(command, "citation_ranges", ()) else set()
+    return hashlib.sha256(command.model_dump_json(exclude=ignored).encode()).hexdigest()
 
 
 class ReviewWorkspace(Contract):
@@ -247,10 +273,9 @@ class TextResearch:
         self,
         ids: tuple[UUID, ...],
         agent: Agent,
-        spans: dict[UUID, tuple[int, int]] | None = None,
+        spans: tuple[SourcePassage, ...] = (),
     ) -> tuple[Evidence, ...]:
-        spans = spans or {}
-        if not set(spans).issubset(ids):
+        if not {span.source_id for span in spans}.issubset(ids):
             raise ValueError("Citation locations must refer to cited sources")
         result = []
         superseded = {p.revises_id for p in self.records.values() if isinstance(p, SourceDocument)}
@@ -260,30 +285,35 @@ class TextResearch:
                 source.visibility == "private" and source.owner_agent_id != agent.id
             ):
                 raise PermissionError("Source is superseded or not available to this participant")
-            content = self.store.get(source.content).decode("utf-8")
-            location = None
-            if identity in spans:
-                start, end = spans[identity]
-                if not 0 <= start < end <= len(content):
-                    raise ValueError("Citation character span is outside source text")
-                location = f"unicode_characters:{start}:{end}"
-            result.append(
-                Evidence(
-                    **self.scope(source.provenance),
-                    id=self.identity("evidence:" + str(identity)),
-                    description=source.title,
-                    source="source-document:" + str(source.id),
-                    artifacts=(source.content,),
-                    source_location=location,
+            locations = [(span.start, span.end) for span in spans if span.source_id == identity]
+            content_length = len(self.store.get(source.content).decode("utf-8"))
+            if any(end > content_length for _, end in locations):
+                raise ValueError("Citation character span is outside source text")
+            labels: list[str | None] = [
+                f"unicode_characters:{start}:{end}" for start, end in locations
+            ]
+            if not labels:
+                labels.append(None)
+            for location in dict.fromkeys(labels):
+                result.append(
+                    Evidence(
+                        **self.scope(source.provenance),
+                        id=self.identity(
+                            "evidence:" + str(identity) + (":" + location if location else "")
+                        ),
+                        description=source.title,
+                        source="source-document:" + str(source.id),
+                        artifacts=(source.content,),
+                        source_location=location,
+                    )
                 )
-            )
         return tuple(result)
 
     def apply(self, command: ReviewCommand) -> Event:
         reject_secrets(command.model_dump_json(), directory=self.ledger.path.parent)
         self.namespace = uuid5(self.branch.id, "review:" + command.idempotency_key)
         self.key = f"review:{self.run.id}:{self.branch.id}:{command.idempotency_key}"
-        self.digest = hashlib.sha256(command.model_dump_json().encode()).hexdigest()
+        self.digest = review_digest(command)
         existing = next((e for e in self.events if e.idempotency_key == self.key), None)
         if existing:
             if existing.command_digest != self.digest:
@@ -311,11 +341,27 @@ class TextResearch:
         phase: str,
         visible_source_ids: tuple[UUID, ...],
         synthetic: bool = False,
+        normalization: ResponseNormalization | None = None,
+        visible_passages: tuple[SourcePassage, ...] = (),
     ) -> Event:
         """Runtime-only structured proposals; model judgments are never verifier evidence."""
         operation = body.get("operation")
-        if operation not in {"claim", "challenge", "respond", "adjudicate", "assess"}:
+        if not isinstance(operation, str) or operation not in {
+            "claim",
+            "challenge",
+            "respond",
+            "adjudicate",
+            "assess",
+        }:
             raise ValueError("Unsupported generated research operation")
+        if body.keys() & {
+            "idempotency_key",
+            "reviewer_id",
+            "reviewer_agent_id",
+            "author_id",
+            "critic_id",
+        }:
+            raise ValueError("Research action may not supply controller-owned fields")
         if operation == "claim" and body.get("revises_id"):
             previous_claim = self.get(UUID(str(body["revises_id"])), Claim)
             if previous_claim.author_id != actor.id:
@@ -333,10 +379,15 @@ class TextResearch:
         supplied = getattr(command, "source_ids", ())
         if not set(supplied).issubset(visible_source_ids):
             raise PermissionError("Generated citations must refer to sources actually supplied")
+        if any(
+            not any(cover.contains(span) for cover in visible_passages)
+            for span in citation_ranges(command)
+        ):
+            raise PermissionError("Generated citation ranges must be visible in this turn")
         reject_secrets(command.model_dump_json(), directory=self.ledger.path.parent)
         self.namespace = uuid5(self.branch.id, "generated:" + phase)
         self.key = f"generated:{self.run.id}:{self.branch.id}:{phase}"
-        self.digest = hashlib.sha256(command.model_dump_json().encode()).hexdigest()
+        self.digest = review_digest(command)
         previous = next((e for e in self.events if e.idempotency_key == self.key), None)
         if previous:
             if previous.command_digest != self.digest:
@@ -368,7 +419,7 @@ class TextResearch:
         return self.ledger.append(
             event.model_copy(
                 update={
-                    "payload": payload,
+                    "payload": (*payload, normalization) if normalization else payload,
                     "provenance": provenance,
                     "actor_id": actor.id,
                     "actor_role": actor.role,
@@ -399,7 +450,7 @@ class TextResearch:
                 raise ValueError("Revise the current claim version")
             for identity in command.dependency_ids:
                 self.get(identity, Claim)
-            evidence = self.source_evidence(command.source_ids, actor, command.citation_spans)
+            evidence = self.source_evidence(command.source_ids, actor, citation_ranges(command))
             claim = Claim(
                 **self.scope(),
                 id=self.identity("claim"),
@@ -421,7 +472,7 @@ class TextResearch:
         if isinstance(command, ReviewChallenge):
             self.get(command.claim_id, Claim)
             actor = self.participant(command.critic_id)
-            evidence = self.source_evidence(command.source_ids, actor)
+            evidence = self.source_evidence(command.source_ids, actor, citation_ranges(command))
             challenge = Challenge(
                 **self.scope(),
                 id=self.identity("challenge"),
@@ -451,7 +502,9 @@ class TextResearch:
                 raise PermissionError("Only the attributed claim author can respond")
             if command.revised_proposition and command.response not in {"accept", "qualify"}:
                 raise ValueError("Only acceptance/qualification can include a proposed revision")
-            added_evidence = self.source_evidence(command.source_ids, actor)
+            added_evidence = self.source_evidence(
+                command.source_ids, actor, citation_ranges(command)
+            )
             response = Challenge(
                 **self.scope(),
                 id=self.identity("response"),
@@ -493,7 +546,7 @@ class TextResearch:
                 challenge = self.get(command.challenge_id, Challenge)
                 if not self.related_claims(command.claim_id, challenge.claim_id):
                     raise ValueError("Assessment challenge must target this claim or an ancestor")
-            evidence = self.source_evidence(command.source_ids, actor)
+            evidence = self.source_evidence(command.source_ids, actor, citation_ranges(command))
             assessment = ClaimAssessment(
                 **self.scope(),
                 id=self.identity("assessment"),
@@ -523,7 +576,9 @@ class TextResearch:
                 raise ValueError("Evidence-linked judgment requires its participant identity")
             evidence = (
                 self.source_evidence(
-                    command.source_ids, self.participant(command.reviewer_agent_id)
+                    command.source_ids,
+                    self.participant(command.reviewer_agent_id),
+                    citation_ranges(command),
                 )
                 if command.reviewer_agent_id
                 else ()
@@ -723,8 +778,8 @@ class TextResearch:
             ),
         )
 
-    def fork(self, command: ReviewFork) -> Event:
-        checkpoint = self.get(command.checkpoint_id, Checkpoint)
+    def validate_fork_checkpoint(self, checkpoint: Checkpoint) -> TextSnapshot:
+        """Validate snapshot ancestry and hashes without appending a record."""
         if checkpoint.trajectory_id != self.branch.id or checkpoint.manifest is None:
             raise ValueError("Checkpoint must be owned by the selected parent branch")
         manifest = TextSnapshot.model_validate_json(self.store.get(checkpoint.manifest))
@@ -749,6 +804,11 @@ class TextResearch:
             != self.experiment.task
         ):
             raise ValueError("Text checkpoint integrity mismatch")
+        return manifest
+
+    def fork(self, command: ReviewFork) -> Event:
+        checkpoint = self.get(command.checkpoint_id, Checkpoint)
+        manifest = self.validate_fork_checkpoint(checkpoint)
         child = Trajectory(
             id=self.identity("branch"),
             run_id=self.run.id,

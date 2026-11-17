@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Literal
 from uuid import UUID
 
+from doxa.core.action_output import research_schema as research_schema
 from doxa.core.models import Contract, Usage
 from doxa.core.profiles import ModelProfile
 from doxa.providers.contracts import (
@@ -37,6 +38,18 @@ CLI_CAPABILITIES = Capabilities(
     cancellation=True,
     tool_calling="unavailable",
 )
+# A storage/transport bound, independent of the token limit checked against CLI usage.
+FINAL_RESPONSE_BYTE_LIMIT = 256 * 1024
+RESPONSE_DIAGNOSTICS = {
+    "cli_timeout_after_turn": "Codex finished the turn, but collecting CLI output timed out",
+    "cli_invalid_final_file": "Codex did not produce a regular final response file",
+    "cli_final_byte_limit": "The final response exceeded the local storage limit",
+    "cli_invalid_final_encoding": "The final response is not valid UTF-8",
+    "cli_empty_final_response": "Codex returned no final answer",
+    "cli_output_token_limit": "Codex reported more output tokens than the configured limit",
+    "cli_stream_limit": "Codex exceeded the local event or stream limit",
+    "cli_invalid_events": "Codex returned an invalid event stream",
+}
 REQUIRED_FLAGS = (
     "--ephemeral",
     "--ignore-user-config",
@@ -179,61 +192,6 @@ class CliFailure(ValueError):
     def __init__(self, category: str):
         self.category = category
         super().__init__("CLI reported a sanitized failure")
-
-
-def research_schema() -> dict[str, Any]:
-    """Native output choices mirror controller contracts; authorization stays in the controller."""
-    from doxa.core.text_research import ReviewAssessment, ReviewDecision, ReviewResponse
-
-    string = {"type": "string"}
-    sources = {"type": "array", "items": string}
-    nullable = {"type": ["string", "null"]}
-    operations: dict[str, dict[str, Any]] = {
-        "claim": {"proposition": string, "source_ids": sources, "revises_id": nullable},
-        "challenge": {"claim_id": string, "objection": string, "source_ids": sources},
-        "respond": {
-            "challenge_id": string,
-            "response": {
-                **ReviewResponse.model_json_schema()["properties"]["response"],
-                "description": "Disposition only. Put the prose explanation in reason.",
-            },
-            "reason": string,
-            "revised_proposition": nullable,
-            "revision_of": nullable,
-            "source_ids": sources,
-        },
-        "adjudicate": {
-            "claim_id": nullable,
-            "challenge_id": nullable,
-            "outcome": ReviewDecision.model_json_schema()["properties"]["outcome"],
-            "reason": string,
-            "source_ids": sources,
-        },
-        "assess": {
-            "claim_id": string,
-            "challenge_id": nullable,
-            "stance": ReviewAssessment.model_json_schema()["properties"]["stance"],
-            "reason": string,
-            "source_ids": sources,
-        },
-    }
-    variants = []
-    for operation, properties in operations.items():
-        props = {"operation": {"type": "string", "const": operation}, **properties}
-        variants.append(
-            {
-                "type": "object",
-                "properties": props,
-                "required": list(props),
-                "additionalProperties": False,
-            }
-        )
-    return {
-        "type": "object",
-        "properties": {"research_action": {"anyOf": variants}},
-        "required": ["research_action"],
-        "additionalProperties": False,
-    }
 
 
 @dataclass(frozen=True)
@@ -675,17 +633,23 @@ class CodexCliProvider:
             async with asyncio.timeout(min(request.timeout_seconds, self.profile.timeout_seconds)):
                 return await self._generate(request, diagnostics)
         except TimeoutError:
+            after_turn = diagnostics.get("stage") == "turn_finished"
             return ModelResponse(
                 call_id=request.call_id,
                 assignment=request.assignment,
                 execution_kind="live",
                 completion_state="incomplete",
                 usage=Usage(latency_seconds=time.monotonic() - started),
-                raw_response={**diagnostics, "diagnostic_code": "cli_timeout"},
+                raw_response={
+                    **diagnostics,
+                    "diagnostic_code": "cli_timeout_after_turn" if after_turn else "cli_timeout",
+                },
                 error=ProviderError(
                     category="timeout",
                     retryable=False,
-                    safe_message="CLI invocation exceeded its time limit",
+                    safe_message=RESPONSE_DIAGNOSTICS["cli_timeout_after_turn"]
+                    if after_turn
+                    else "CLI invocation exceeded its time limit",
                 ),
             )
 
@@ -694,7 +658,12 @@ class CodexCliProvider:
         started = time.monotonic()
         observed_usage = Usage()
 
-        def failed(category: str, uncertain: bool = True, code: str | None = None) -> ModelResponse:
+        def failed(
+            category: str,
+            uncertain: bool = True,
+            code: str | None = None,
+            final_text: str | None = None,
+        ) -> ModelResponse:
             return ModelResponse(
                 call_id=request.call_id,
                 assignment=request.assignment,
@@ -703,6 +672,7 @@ class CodexCliProvider:
                 raw_response={
                     **diagnostics,
                     "diagnostic_code": code or "cli_" + category + "_failure",
+                    **({"rejected_final_text": final_text} if final_text is not None else {}),
                 },
                 usage=observed_usage.model_copy(
                     update={"latency_seconds": time.monotonic() - started}
@@ -712,9 +682,10 @@ class CodexCliProvider:
                         category=category,
                         retryable=False,
                         billing_uncertain=uncertain,
-                        safe_message="CLI invocation failed: "
-                        + category
-                        + (" (" + code + ")" if code else ""),
+                        safe_message=RESPONSE_DIAGNOSTICS.get(
+                            code or "",
+                            "CLI invocation failed: " + category + (f" ({code})" if code else ""),
+                        ),
                     )
                 ),
             )
@@ -745,6 +716,11 @@ class CodexCliProvider:
                     if self.activity_observer:
                         self.activity_observer("process_started")
 
+                def observed(stage: str) -> None:
+                    diagnostics["stage"] = stage
+                    if self.activity_observer:
+                        self.activity_observer(stage)
+
                 result = await run_process(
                     argv,
                     cwd,
@@ -755,7 +731,7 @@ class CodexCliProvider:
                     active=self.active,
                     call_id=request.call_id,
                     on_spawn=spawned,
-                    on_event=self.activity_observer,
+                    on_event=observed,
                 )
                 diagnostics.update(exit_code=result.code, stage="process_exited")
                 if result.pid is not None:
@@ -773,28 +749,41 @@ class CodexCliProvider:
                 response = self.parse(request, result.stdout, status)
                 observed_usage = response.usage
                 # Prefer the bounded final file when present; reject symlinks/non-regular files.
+                if final_path.is_symlink():
+                    return failed("invalid_response", code="cli_invalid_final_file")
                 if final_path.exists():
-                    if (
-                        final_path.is_symlink()
-                        or not final_path.is_file()
-                        or final_path.stat().st_size > request.max_output_tokens
-                    ):
-                        return failed("invalid_response")
-                    text = final_path.read_text(encoding="utf-8")
-                    if text.strip() or response.completion_state != "refused":
+                    if not final_path.is_file():
+                        return failed("invalid_response", code="cli_invalid_final_file")
+                    with final_path.open("rb") as final:
+                        body = final.read(FINAL_RESPONSE_BYTE_LIMIT + 1)
+                    if len(body) > FINAL_RESPONSE_BYTE_LIMIT:
+                        return failed("invalid_response", code="cli_final_byte_limit")
+                    try:
+                        text = body.decode("utf-8")
+                    except UnicodeDecodeError:
+                        return failed("invalid_response", code="cli_invalid_final_encoding")
+                    if text.strip():
                         response = response.model_copy(update={"text": text})
                 if response.text is None or not response.text.strip():
-                    return failed("invalid_response")
-                if len(response.text.encode()) > request.max_output_tokens:
-                    return failed("invalid_response")
-                if request.response_schema and response.completion_state == "completed":
-                    # The CLI enforces the schema; DOXA still refuses invalid JSON at its boundary.
-                    json.loads(response.text)
+                    return failed(
+                        "invalid_response",
+                        code="cli_empty_final_response",
+                        final_text=response.text,
+                    )
+                if len(response.text.encode()) > FINAL_RESPONSE_BYTE_LIMIT:
+                    return failed("invalid_response", code="cli_final_byte_limit")
+                # Preserve exact final text even for schema-enabled requests. The research
+                # controller classifies response syntax separately from provider failures.
                 if (
                     response.usage.output_tokens is not None
                     and response.usage.output_tokens > request.max_output_tokens
                 ):
-                    response = response.model_copy(update={"completion_state": "incomplete"})
+                    return failed(
+                        "invalid_response",
+                        uncertain=response.finish_reason == "completion_unobserved",
+                        code="cli_output_token_limit",
+                        final_text=response.text,
+                    )
                 return response.model_copy(
                     update={
                         "usage": response.usage.model_copy(
@@ -810,11 +799,16 @@ class CodexCliProvider:
         except asyncio.CancelledError:
             raise
         except TimeoutError:
-            return failed("timeout")
+            return failed(
+                "timeout",
+                code="cli_timeout_after_turn" if diagnostics["stage"] == "turn_finished" else None,
+            )
+        except StreamLimit:
+            return failed("invalid_response", code="cli_stream_limit")
         except CliFailure as exc:
             return failed(exc.category)
-        except (ValueError, UnicodeError, KeyError, TypeError):
-            return failed("invalid_response")
+        except (ValueError, KeyError, TypeError, RecursionError):
+            return failed("invalid_response", code="cli_invalid_events")
         except SpawnFailed:
             return failed("configuration", False)
         except OSError:

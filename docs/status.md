@@ -5,6 +5,31 @@ Textual and the CLI; React Studio and the native graphical desktop are retired.
 
 ## Observed verification
 
+- **DOXA 0.1.0 Alpha 1 review candidate:** centralized `0.1.0a1` identity, Windows
+  version resources, compatible installer paths, and the accumulated research and
+  terminal fixes. See [Alpha 1 review](alpha1-review.md) for the 611-test regression
+  result, packaging checks, and remaining verification limits. No release published.
+
+- **v28 playtest corrections (source/offline):** persisted response authorship,
+  failed-run disposition, select-latest, revision wording and keyboard focus recovery.
+  See [playtest corrections](v28-playtest-corrections.md). The installed frozen
+  executable has not been updated by these source changes.
+
+- **Paper evidence:** section-aware initial selection, exact targeted citations,
+  explicit evidence gaps, and saved input inspection. See [paper evidence](paper-evidence-context.md) for the offline comparison and limits.
+
+- **Live Council:** a chronological, trajectory-scoped feed of committed contributions
+  with claim following, version inspection and checkpoint-backed branch preparation.
+  See [Live Council](live-council.md) for navigation and offline verification.
+
+- **Research integrity consolidation:** exact passage delivery, bounded citation validation,
+  and a navigable claim and run inspector. See the
+  [consolidation report](research-integrity-consolidation.md) for the offline checks,
+  measured read paths, and remaining limits.
+
+- **Structured Council replies:** centralized parsing and versioned normalization audit
+  records. The controller still validates every action. The [normalization guide](research-response-normalization.md) documents accepted forms and capture limits.
+
 - **Secure model connections:** the existing terminal form can list and select local
   models before saving. Managed API references resolve only through protected storage.
   Reachability, declared capabilities and launch authorization remain separate. See
@@ -16,7 +41,7 @@ Textual and the CLI; React Studio and the native graphical desktop are retired.
   Windows/Linux pass (105 source files). Twenty-one new regressions cover opt-in dispute
   review, stale/current judgments, accepted claims, conflicting Archivists, hard caps,
   cancellation/timeout, plateau, citation reference/span diagnostics, terminal forms at
-  80×24 and 120×40, CLI configuration and exact export/restore. The first full run found
+  80Ã—24 and 120Ã—40, CLI configuration and exact export/restore. The first full run found
   a stale descriptive-evaluator selector in the canonical acceptance script (509 passed,
   five setup errors); the selector was corrected, its five checks passed, and the whole
   suite was rerun successfully. Public schemas reproduce unchanged; no SQL migration.

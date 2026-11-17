@@ -59,6 +59,7 @@ if ($old) { foreach ($file in $old.files) { $owned[$file.path] = $file.sha256 } 
 [void][IO.Directory]::CreateDirectory($root)
 $manifestPath = Get-DoxaChild $root 'install-manifest.json'
 $manifest = [ordered]@{ application='DOXA'; format=1; root=$root; build=$release.build;
+    version=$release.version; display_name=$release.display_name;
     environment_key=$EnvironmentKey; path_added=$pathAdded; path_before=$pathBefore;
     path_after=$pathAfter; path_kind_before=$pathKindBefore; state='installing'; files=@() }
 if (-not $old) { Write-DoxaJson $manifestPath $manifest }
@@ -117,4 +118,5 @@ if ($AddToPath) {
 } else {
     Write-Output 'Installed without PATH changes. Re-run with -AddToPath for explicit current-user registration.'
 }
-Write-Output "Installed $($release.build) at $root. No workspace or credential was moved."
+$displayName = if ($release.display_name) { $release.display_name } else { 'DOXA (legacy package)' }
+Write-Output "Installed $displayName at $root. No workspace or credential was moved."
