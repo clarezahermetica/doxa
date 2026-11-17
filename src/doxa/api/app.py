@@ -63,7 +63,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if active:
             await asyncio.gather(*(task for _, task in active), return_exceptions=True)
 
-    app = FastAPI(title="DOXA foundation", version="0.1.0a0", lifespan=lifespan)
+    from doxa.version import VERSION
+
+    app = FastAPI(title="DOXA foundation", version=VERSION, lifespan=lifespan)
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"]
     )

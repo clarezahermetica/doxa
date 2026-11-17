@@ -87,7 +87,11 @@ def test_independent_operator_creates_reviews_branches_and_exports_without_inter
 
             await pilot.pause()
             assert isinstance(app.screen, GettingStarted)
-            await activate("#guide-offline")
+            guide = pilot.app.screen
+            assert isinstance(guide, GettingStarted)
+            guide.flow, guide.step, guide.execution = "offline", 0, "synthetic"
+            guide.update_step()
+            await pilot.pause()
             await activate("#guide-do")
             app.screen.query_one("#workspace-create", Checkbox).value = True
             await activate("#workspace-open")

@@ -5,7 +5,7 @@ import json
 import sys
 
 import pytest
-from textual.widgets import Input, TabbedContent, TextArea
+from textual.widgets import Input, Select, TabbedContent, TextArea
 
 from doxa.cli.console import ResearchConsole
 from doxa.cli.inspectors import describe_record
@@ -17,6 +17,32 @@ from doxa.core.research_manifest import public_summary
 from doxa.core.workbench import DebateExecution, DebateRuntime
 from tests.test_cli_session import REAL_RUN
 from tests.test_investigation_protocol import prepare
+
+
+def test_idle_console_reads_accounting_without_rehydrating_events(
+    controller, monkeypatch, tmp_path
+):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "client"))
+    run = prepare(controller)
+
+    async def verify():
+        app = ResearchConsole(controller.settings.data_dir, show_guide=False)
+        app.selected = run.id
+        async with app.run_test(size=(80, 24)) as pilot:
+            for _ in range(50):
+                if app.current_bundle is not None and not app._loading:
+                    break
+                await pilot.pause(0.05)
+            assert app.current_bundle is not None
+            events = app.current_bundle.events
+            monkeypatch.setattr(
+                app.controller, "run_accounting", lambda run_id: ({"state": "uncertain"},)
+            )
+            await app.read_bundle()
+            assert app.current_bundle.events is events
+            assert app.uncertain
+
+    asyncio.run(verify())
 
 
 def test_matching_model_settings_include_temperature_and_wire_protocol():
@@ -132,7 +158,14 @@ def test_exchange_citation_expansion_and_read_only_replay(
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "client"))
     run = prepare(controller, text="[Page 1]\nIRRELEVANT_PAGE_ONE\n[Page 4]\nCITED_PASSAGE_FOUR")
     asyncio.run(DebateRuntime(controller, run.id).execute_debate(DebateExecution()))
+    from doxa.core.run_overview import run_overview
+
     before = controller.inspect(run.id).model_dump_json()
+    summary = run_overview(controller, run.id)
+    assert "Objective correctness: unknown" in summary
+    assert "Epistemic Git: exercised in synthetic fixture" in summary
+    assert "Independent verification records: 0" in summary
+    assert "Recorded stop reason:" in summary
 
     async def view():
         app = ResearchConsole(controller.settings.data_dir, show_guide=False)
@@ -147,6 +180,10 @@ def test_exchange_citation_expansion_and_read_only_replay(
             await pilot.press("enter")
             await pilot.pause()
             assert isinstance(app.screen, ThreadScreen)
+            sections = app.screen.query_one("#thread-section", Select)
+            assert sections.value == str(app.screen.thread.current.id)
+            sections.value = "full"
+            await pilot.pause()
             text = app.screen.query_one("#thread-text", TextArea).text
             assert (
                 "OBJECTION" in text and "AUTHOR RESPONSE" in text and "VERSION COMPARISON" in text

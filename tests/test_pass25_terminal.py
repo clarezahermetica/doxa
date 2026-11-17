@@ -30,7 +30,7 @@ def test_compact_home_choices_and_task_reference(controller, tmp_path, monkeypat
             assert isinstance(app.screen, GettingStarted)
             assert app.screen.query_one("#guide-dialog").region.height < 20
             assert not app.screen.query_one("#guide-do").display
-            for key in ("explore", "offline", "help"):
+            for key in ("explore", "research", "help"):
                 assert app.screen.query_one("#guide-" + key, Button).display
             await click(pilot, "#guide-help")
             assert isinstance(app.screen, CommandReference)
@@ -108,7 +108,11 @@ def test_guide_start_explains_state_and_missing_templates(controller, tmp_path, 
                 await pilot.pause()
             app.action_guide()
             await pilot.pause()
-            await click(pilot, "#guide-offline")
+            guide = pilot.app.screen
+            assert isinstance(guide, GettingStarted)
+            guide.flow, guide.step, guide.execution = "offline", 0, "synthetic"
+            guide.update_step()
+            await pilot.pause()
             app.screen.step = 4
             app.screen.update_step()
             button = app.screen.query_one("#guide-do", Button)
@@ -147,7 +151,11 @@ def test_guide_explains_missing_agent_before_creation(controller, tmp_path, monk
         app = ResearchConsole(controller.settings.data_dir, show_guide=True)
         async with app.run_test(size=(80, 24)) as pilot:
             await pilot.pause()
-            await click(pilot, "#guide-offline")
+            guide = pilot.app.screen
+            assert isinstance(guide, GettingStarted)
+            guide.flow, guide.step, guide.execution = "offline", 0, "synthetic"
+            guide.update_step()
+            await pilot.pause()
             app.screen.step = 2
             app.screen.update_step()
             assert app.screen.query_one("#guide-do", Button).disabled

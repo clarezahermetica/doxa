@@ -216,7 +216,6 @@ class GettingStarted(ModalScreen[str | None]):
             with Vertical(id="guide-home"):
                 yield Button("Open existing research", id="guide-explore")
                 yield Button("Create a research experiment", id="guide-research")
-                yield Button("Try an offline demonstration", id="guide-offline")
                 yield Button("Commands and help", id="guide-help")
             yield TextArea(read_only=True, id="guide-text", tab_behavior="focus")
             yield Select(
@@ -381,7 +380,7 @@ class GettingStarted(ModalScreen[str | None]):
             return
         if not self.console.controller.list_runs():
             self.notify(
-                "No experiments here. Choose Create research or Try an offline demonstration."
+                "No experiments here. Choose Create a research experiment."
             )
             return
 
@@ -408,9 +407,9 @@ class GettingStarted(ModalScreen[str | None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()
         identity = event.button.id
-        if identity in {"guide-offline", "guide-research"}:
-            self.flow = "offline" if identity == "guide-offline" else "research"
-            self.execution = "synthetic" if self.offline else None
+        if identity == "guide-research":
+            self.flow = "research"
+            self.execution = None
             self.step = 0
             self.update_step()
             self.query_one("#guide-do", Button).focus()

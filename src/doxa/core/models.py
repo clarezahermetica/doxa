@@ -492,6 +492,31 @@ class SourceDocument(ScopedRecord):
         return self
 
 
+class SourcePassage(Contract):
+    source_id: UUID
+    start: int = Field(ge=0, strict=True)
+    end: int = Field(gt=0, strict=True)
+
+    @model_validator(mode="after")
+    def nonempty(self) -> Self:
+        if self.end <= self.start:
+            raise ValueError("Citation range must have an exclusive end after its start")
+        return self
+
+    def contains(self, other: "SourcePassage") -> bool:
+        return (
+            self.source_id == other.source_id and self.start <= other.start < other.end <= self.end
+        )
+
+
+class PassageAvailability(Contract):
+    passage: SourcePassage
+    challenge_ids: tuple[UUID, ...]
+    status: Literal[
+        "supplied", "omitted_budget", "source_absent", "source_ineligible", "passage_unavailable"
+    ]
+
+
 class ContextManifest(ScopedRecord):
     kind: Literal["context_manifest"] = "context_manifest"
     agent_id: UUID
@@ -501,6 +526,8 @@ class ContextManifest(ScopedRecord):
     profile_version: int | None = None
     task_version: int
     source_ids: tuple[UUID, ...] = ()
+    source_passages: tuple[SourcePassage, ...] = ()
+    required_passages: tuple[PassageAvailability, ...] = ()
     memory_ids: tuple[UUID, ...] = ()
     history_ids: tuple[UUID, ...] = ()
     messages: ArtifactRef
@@ -555,6 +582,19 @@ class ClaimAssessment(ScopedRecord):
     evidence_ids: tuple[UUID, ...] = ()
 
 
+class ResponseNormalization(ScopedRecord):
+    kind: Literal["response_normalization"] = "response_normalization"
+    normalizer_version: str
+    agent_id: UUID
+    context_id: UUID
+    model_call_id: UUID | None = None
+    input_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    execution_kind: Literal["live", "synthetic"]
+    disposition: Literal["accepted", "format_rejected", "action_rejected"]
+    transforms: tuple[Literal["json_fence", "singleton_operations"], ...] = ()
+    reason_code: str
+
+
 class ResearchOutcome(ScopedRecord):
     decision_ids: tuple[UUID, ...] = ()
     kind: Literal["research_outcome"] = "research_outcome"
@@ -574,6 +614,7 @@ Record = Annotated[
     | ProcedureManifest
     | ProviderActivity
     | ClaimAssessment
+    | ResponseNormalization
     | ResearchOutcome
     | Evidence
     | Decision

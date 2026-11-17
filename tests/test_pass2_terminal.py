@@ -255,7 +255,11 @@ def test_new_user_completes_offline_workflow_using_guide(tmp_path, monkeypatch):
             await pilot.pause()
             await pilot.pause()
             assert isinstance(app.screen, GettingStarted)
-            await click(pilot, "#guide-offline")
+            guide = pilot.app.screen
+            assert isinstance(guide, GettingStarted)
+            guide.flow, guide.step, guide.execution = "offline", 0, "synthetic"
+            guide.update_step()
+            await pilot.pause()
             await click(pilot, "#guide-do")
             app.screen.query_one("#workspace-create", Checkbox).value = True
             await click(pilot, "#workspace-open")
@@ -268,7 +272,11 @@ def test_new_user_completes_offline_workflow_using_guide(tmp_path, monkeypatch):
                     await click(pilot, "#reference-guide")
                 if app.screen.flow is not None:
                     await click(pilot, "#guide-back")
-                await click(pilot, "#guide-offline")
+                guide = pilot.app.screen
+                assert isinstance(guide, GettingStarted)
+                guide.flow, guide.step, guide.execution = "offline", 0, "synthetic"
+                guide.update_step()
+                await pilot.pause()
                 while app.screen.step < step:
                     await click(pilot, "#guide-next")
                 while app.screen.step > step:

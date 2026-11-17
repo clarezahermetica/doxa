@@ -12,6 +12,7 @@ from doxa.core.secrets import workspace_env
 from doxa.providers.registry import provider_environment, readiness, spending_allowance
 from doxa.providers.runpod import endpoint_url
 from doxa.storage.configurations import ConfigurationStore
+from doxa.storage.local_dispatch import quota_hold
 
 if TYPE_CHECKING:
     from doxa.core.controller import Controller
@@ -62,6 +63,7 @@ def preflight(controller: "Controller", run_id: UUID) -> Preflight:
     participants: list[dict[str, JsonValue]] = []
     remote = False
     quota = False
+    quota_services: set[str] = set()
     requests = 0
     rounds = 1 if bundle.run.mode.value == "solo_direct" else task.council.rounds if task else 0
     for actor in experiment.agents:
@@ -93,6 +95,12 @@ def preflight(controller: "Controller", run_id: UUID) -> Preflight:
                     if profile.transport == "cli_session"
                     else endpoint_url(profile, env),
                     transport=profile.transport,
+                    effective_timeout_seconds=min(
+                        profile.timeout_seconds, experiment.budget.timeout_seconds
+                    ),
+                    effective_output_tokens=min(
+                        profile.max_output_tokens, experiment.budget.max_output_tokens
+                    ),
                     accounting_basis="subscription_quota"
                     if profile.transport == "cli_session"
                     else "local_unbilled"
@@ -100,6 +108,7 @@ def preflight(controller: "Controller", run_id: UUID) -> Preflight:
                     else "api_usd",
                 )
                 if profile.transport == "cli_session":
+                    quota_services.add(profile.runtime)
                     row["reasoning_effort"] = profile.reasoning.get("effort")
                     row["reasoning_source"] = (
                         "explicit_profile" if profile.reasoning else "CLI_default_unverified"
@@ -131,6 +140,18 @@ def preflight(controller: "Controller", run_id: UUID) -> Preflight:
                 row["status"] = "unavailable"
         requests += rounds * attempts * (1 + task.max_tool_rounds if task else 1)
         participants.append(row)
+    for service in sorted(quota_services):
+        hold = quota_hold(controller.settings.database_path, service)
+        if hold == "uncertain":
+            blockers.append(
+                f"{service}: uncertain-operation hold from an earlier call. "
+                "Review the workspace's usage and recovery records before retrying."
+            )
+        elif hold == "in_flight":
+            blockers.append(
+                f"{service}: another call is in progress or still awaiting recovery. "
+                "Check its run before starting another."
+            )
     if task and task.research_protocol == "investigation":
         requests = min(task.council.max_calls, experiment.budget.max_model_calls)
     cap = min(experiment.budget.max_model_calls, task.council.max_calls) if task else 0
@@ -232,6 +253,10 @@ def format_preflight(report: Preflight) -> str:
         lines.append(
             "Run spending ceiling USD: " + str(report.limits.get("run_cap_usd", "unknown"))
         )
+    council = report.limits.get("council")
+    seconds = council.get("timeout_seconds") if isinstance(council, dict) else None
+    if isinstance(seconds, (int, float)):
+        lines.append(f"Council time limit: {seconds:g}s")
     for row in report.participants:
         lines.append(
             f"{row.get('name')} · {row.get('role')} · "
@@ -243,6 +268,10 @@ def format_preflight(report: Preflight) -> str:
                 "Reasoning requested: "
                 + str(row.get("reasoning_effort") or "CLI default (unverified)")
             )
+        timeout = row.get("effective_timeout_seconds")
+        tokens = row.get("effective_output_tokens")
+        if isinstance(timeout, (int, float)) and isinstance(tokens, int):
+            lines.append(f"Per call: {timeout:g}s, {tokens} output tokens")
     lines.extend("Blocked: " + text for text in report.blockers)
     lines.append(
         "Authorization: " + (", ".join(report.authorization_required) or "no paid API requested")

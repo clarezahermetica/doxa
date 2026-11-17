@@ -216,6 +216,14 @@ def run_cancel(run_id: UUID, data_dir: Path = DEFAULT_DATA_DIR) -> None:
     typer.echo("Cancellation recorded. Remote billing may remain unknown.")
 
 
+@run_app.command("summary")
+def run_summary(run_id: UUID, data_dir: Path = DEFAULT_DATA_DIR) -> None:
+    """Inspect the recorded protocol, provenance, usage and system coverage without inference."""
+    from doxa.core.run_overview import run_overview
+
+    typer.echo(run_overview(instance(data_dir), run_id))
+
+
 def install(app: typer.Typer) -> None:
     app.add_typer(experiment_app, name="experiment")
     app.add_typer(run_app, name="run")

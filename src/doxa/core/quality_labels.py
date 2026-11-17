@@ -47,7 +47,7 @@ def label_correction(
     )
 
 
-def correction_metrics(records: list[Any]) -> dict[str, Any]:
+def human_correction_labels(records: list[Any]) -> dict[UUID, dict[str, Any]]:
     labels: dict[UUID, dict[str, Any]] = {}
     revisions = {p.id for p in records if isinstance(p, Claim) and p.revises_id}
     for record in records:
@@ -71,6 +71,12 @@ def correction_metrics(records: list[Any]) -> dict[str, Any]:
             labels[record.subject_id] = value
         except (ValueError, AttributeError):
             continue
+    return labels
+
+
+def correction_metrics(records: list[Any]) -> dict[str, Any]:
+    labels = human_correction_labels(records)
+    revisions = {p.id for p in records if isinstance(p, Claim) and p.revises_id}
     complete = [
         v
         for v in labels.values()

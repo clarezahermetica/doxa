@@ -89,15 +89,27 @@ schema/record fields; preserve a verified backup before deliberately upgrading a
 ## Limits and extension
 
 - The CLI has no documented per-request generation-token ceiling used by this adapter.
-  DOXA enforces admission and conservatively bounds accepted final UTF-8 bytes by the
-  configured output-token count; this is **not** a hard server-side reasoning/quota cap.
-  Output beyond the bound is rejected while observed usage is retained.
+  DOXA enforces admission, caps the final reply at 256 KiB independently, and checks
+  the configured output-token limit against the count Codex reports. Rejected replies
+  retain observed usage, if available. These checks cannot cap server-side generation
+  or subscription consumption. A missing token count is recorded as unknown.
+- Preflight shows the effective per-call timeout and output limit (the lower of the
+  model profile and experiment limits), the overall Council timeout, and existing
+  in-flight or uncertain quota holds in the selected workspace.
+- Prompted structured research accepts raw JSON or a single fenced JSON reply. Prose
+  may appear in the fields that accept text. DOXA does not infer structured actions
+  from surrounding prose or treat malformed actions as successful research. If a reply
+  wraps exactly one action in an `operations` array, DOXA validates that action normally;
+  empty arrays and batches are rejected.
+  See [research reply normalization](research-response-normalization.md) for the full
+  rules, ledger provenance, and capture limits.
 - Process termination cannot prove remote work stopped or establish a final bill. Hard
   parent-process termination may leave a child; uncertainty remains until investigated.
 - `cli-default` is an explicit default-model sentinel. The selected/reported model is
   recorded only if supplied by CLI events; DOXA does not invent an exact model identity.
   Sampling uses CLI defaults, not an asserted temperature setting.
-- Only text research is supported. No native tools, streaming viewer, automatic continuation,
+- Only text research is supported. The viewer follows committed activity without showing
+  private reasoning or streaming raw model tokens. No native tools, automatic continuation,
   remote history access, arbitrary CLI commands or custom executable/argument forms.
 - Adapters implement the existing ModelProvider request/response/cancel boundary and are
   registered in trusted Python code. Additional account CLIs require reviewed safe flags,

@@ -1,3 +1,5 @@
 """Local-first experimental research. See docs/status.md for verified scope."""
 
-__version__ = "0.1.0a0"
+from doxa.version import VERSION as __version__
+
+__all__ = ["__version__"]

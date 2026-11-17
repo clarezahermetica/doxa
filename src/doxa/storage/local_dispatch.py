@@ -1,8 +1,25 @@
 """Atomic admission for unbilled loopback inference; no synthetic financial charge."""
 
+from pathlib import Path
+from sqlite3 import Connection
+
 from doxa.core.models import Event, ModelCall
 from doxa.storage.database import connection, require_active_run
 from doxa.storage.ledger import Ledger
+
+
+def _quota_hold(db: Connection, service: str) -> str | None:
+    row = db.execute(
+        "SELECT state FROM quota_operations WHERE service=? "
+        "AND state IN ('in_flight','uncertain') ORDER BY state DESC LIMIT 1",
+        (service,),
+    ).fetchone()
+    return str(row[0]) if row else None
+
+
+def quota_hold(path: Path, service: str) -> str | None:
+    with connection(path) as db:
+        return _quota_hold(db, service)
 
 
 def admit_local(
@@ -40,11 +57,7 @@ def admit_local(
             raise ValueError("Local runtime concurrency or interrupted-call guard reached")
         if quota:
             service = str(requested.request_settings["adapter"])
-            if db.execute(
-                "SELECT 1 FROM quota_operations WHERE service=? "
-                "AND state IN ('in_flight','uncertain')",
-                (service,),
-            ).fetchone():
+            if _quota_hold(db, service):
                 raise ValueError("CLI account concurrency or uncertain-operation guard reached")
             admitted = {str(c.call_id) for c in calls.values() if c.run_id == requested.run_id}
             admitted.update(

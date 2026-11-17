@@ -1,6 +1,7 @@
 """Account CLI regression tests. Real model executables/authentication are never invoked."""
 
 import asyncio
+import hashlib
 import json
 import os
 import sys
@@ -13,13 +14,17 @@ from typer.testing import CliRunner
 
 from doxa.core.models import (
     BudgetPolicy,
+    Challenge,
     Claim,
     ContextManifest,
     CouncilLimits,
+    Decision,
     ModelAssignment,
     ModelCall,
     ProtocolMode,
+    ResponseNormalization,
     Role,
+    RunState,
     TaskSpecification,
 )
 from doxa.core.preflight import authorize, preflight
@@ -37,6 +42,7 @@ from doxa.core.workbench import (
 )
 from doxa.providers import cli_session as cli
 from doxa.providers.contracts import Capabilities, ModelMessage, ModelRequest
+from doxa.storage.artifacts import ArtifactStore
 from doxa.storage.budget import BudgetStore
 from doxa.storage.database import connection
 
@@ -79,6 +85,8 @@ def fake_cli(monkeypatch, tmp_path):
         stderr=b"",
         usage={"input_tokens": 12, "output_tokens": 4},
         events=None,
+        before_exec=None,
+        final_bytes=None,
     )
 
     async def runner(argv, cwd, prompt=b"", **kwargs):
@@ -100,9 +108,11 @@ def fake_cli(monkeypatch, tmp_path):
             return state.auth
         assert argv[1] == "exec" and argv[-1] == "-"
         assert not list(Path(cwd).iterdir()), "Model cwd must be empty"
+        if state.before_exec:
+            state.before_exec(argv)
         if "--output-last-message" in argv and state.code == 0:
-            Path(argv[argv.index("--output-last-message") + 1]).write_text(
-                state.text, encoding="utf-8"
+            Path(argv[argv.index("--output-last-message") + 1]).write_bytes(
+                state.final_bytes if state.final_bytes is not None else state.text.encode()
             )
         events = (
             state.events
@@ -306,8 +316,14 @@ def test_old_http_profile_defaults_and_all_registered_transports_remain_availabl
     assert {"openai", "claude", "gemini", "openai_compatible", "runpod", "codex_cli"} <= supported
 
 
-def configured(controller, fake_cli, *, profile_id="codex-account", timeout=30):
-    p = profile(id=profile_id, timeout_seconds=timeout)
+def configured(
+    controller, fake_cli, *, profile_id="codex-account", timeout=30, structured="native"
+):
+    p = profile(
+        id=profile_id,
+        timeout_seconds=timeout,
+        capabilities=Capabilities(text_generation="available", structured_output=structured),
+    )
     controller.save_configuration(CouncilConfig(profiles=(p,)))
     actor = add_agent(
         controller,
@@ -454,15 +470,27 @@ def test_uncertain_quota_call_is_durable_and_blocks_other_profile_attempts(contr
     operations = BudgetStore(controller.settings.database_path).operations()
     assert operations[0]["state"] == "uncertain" and operations[0]["reserved_calls"] == 1
     assert operations[0]["quota_consumed"] is None
+    failed = [p for e in controller.inspect(run.id).events for p in e.payload]
+    assert not any(isinstance(p, ResponseNormalization) for p in failed)
+    assert next(p.reason_code for p in reversed(failed) if isinstance(p, RunState)) == (
+        "provider:transport"
+    )
     controller.recover_run(run.id)
     assert BudgetStore(controller.settings.database_path).operations()[0] == operations[0]
     second, _ = configured(controller, fake_cli, profile_id="other-codex-account-profile")
+    report = preflight(controller, second.id)
+    assert not report.eligible
+    assert any("uncertain-operation" in b for b in report.blockers)
+    before = [call for call in fake_cli.calls if call[0][-1] == "-"]
     with pytest.raises(ValueError, match="uncertain-operation"):
         asyncio.run(
             DebateRuntime(controller, second.id).execute_debate(
                 DebateExecution(authorize_external=True, authorize_quota=True)
             )
         )
+    assert [call for call in fake_cli.calls if call[0][-1] == "-"] == before
+    assert BudgetStore(controller.settings.database_path).operations() == operations
+    assert controller.inspect(second.id).run.status == "configured"
 
 
 @pytest.mark.parametrize("channel", ["stdout", "stderr", "events"])
@@ -736,6 +764,213 @@ def test_quota_preflight_explains_unknown_cost_instead_of_zero(controller, fake_
     report = format_preflight(preflight(controller, run.id))
     assert "USD billing unavailable, not zero" in report
     assert "Run spending ceiling USD" not in report
+    assert "Per call: 30s, 1024 output tokens" in report
+    assert "Council time limit: 120s" in report
+
+
+def test_four_roles_five_staged_rounds_through_cli_transport(controller, fake_cli):
+    p = profile(
+        model_id="gpt-6.1-sol",
+        reasoning={"effort": "medium"},
+        capabilities=Capabilities(text_generation="available", structured_output="prompted"),
+        timeout_seconds=60,
+        max_context_tokens=16384,
+        max_input_bytes=14336,
+        max_output_tokens=1536,
+    )
+    controller.save_configuration(CouncilConfig(profiles=(p,)))
+    templates = [
+        add_agent(
+            controller,
+            NewAgent(
+                display_name=role.value,
+                role=role,
+                instructions="Evaluate the supplied evidence and preserve uncertainty.",
+                profile_id=p.id,
+                profile_version=p.version,
+                remote_inference=True,
+            ),
+        )
+        for role in (Role.EXECUTOR, Role.RESEARCHER, Role.SKEPTIC, Role.ARCHIVIST)
+    ]
+    run = create_experiment(
+        controller,
+        NewExperiment(
+            name="Five-round paper experiment transport fixture",
+            execution_kind="live",  # Exercise live controller logic with a fake subprocess.
+            mode=ProtocolMode.ADVERSARIAL,
+            task=TaskSpecification(
+                question="Can language models reliably correct reasoning without feedback?",
+                structured_actions=True,
+                staged_research=True,
+                council=CouncilLimits(
+                    rounds=5,
+                    max_calls=20,
+                    per_agent_tokens=81920,
+                    total_tokens=327680,
+                    timeout_seconds=1200,
+                ),
+            ),
+            participants=tuple(ParticipantGroup(agent_id=a.id) for a in templates),
+            budget=BudgetPolicy(
+                max_model_calls=20,
+                timeout_seconds=120,
+                max_context_tokens=16384,
+                max_output_tokens=1536,
+            ),
+            idempotency_key="five-round-cli-fixture",
+        ),
+    )
+    import_source(
+        controller,
+        run.id,
+        ImportSource(
+            title="Paper-shaped fixture",
+            text="\n\n".join(
+                f"Section {i}: Test with and without external feedback. "
+                "Report which examples improved and which regressed. " * 20
+                for i in range(24)
+            ),
+            idempotency_key="paper-fixture",
+        ),
+    )
+    runtime = DebateRuntime(controller, run.id)
+    agents = {a.id: a for a in runtime.experiment.agents}
+    prepared = []
+
+    def fixture_output(argv):
+        assert "--output-schema" not in argv
+        context = next(
+            p
+            for e in reversed(controller.ledger.events(run.id))
+            for p in e.payload
+            if isinstance(p, ContextManifest)
+        )
+        system, user = json.loads(runtime.store.get(context.messages))
+        assert 'use only IDs from "source_id" entries' in system["content"]
+        entries = [json.loads(line) for line in user["content"].splitlines()[1:]]
+        assert {row["source_id"] for row in entries if "source_id" in row} == {
+            str(identity) for identity in context.source_ids
+        }
+        assert {row["history_record_id"] for row in entries if "history_record_id" in row} == {
+            str(identity) for identity in context.history_ids
+        }
+        prepared.append(context)
+        body = json.loads(
+            runtime.synthetic_answer(agents[context.agent_id], context.phase, context)
+        )
+        action = body["research_action"]
+        for field in ("proposition", "objection", "reason"):
+            if field in action:
+                action[field] += " A bounded argument remains unresolved." * 57
+        if context.phase.startswith("round:0:"):
+            # The live Executor returned exactly this singleton wrapper.
+            body["research_action"] = {"operations": [action]}
+        answer = json.dumps(body)
+        # Reproduce replies above the old byte ceiling without fabricating token usage in
+        # production. Whitespace makes the fixture long while leaving the action unchanged.
+        fake_cli.text = "```json\n" + answer + " " * 1600 + "\n```\n"
+        fake_cli.usage = {"input_tokens": 10593, "output_tokens": 470}
+
+    fake_cli.before_exec = fixture_output
+    bundle = asyncio.run(
+        runtime.execute_debate(DebateExecution(authorize_external=True, authorize_quota=True))
+    )
+    assert bundle.run.status == "completed"
+    records = [p for e in bundle.events for p in e.payload]
+    completed = [p for p in records if isinstance(p, ModelCall) and p.status == "completed"]
+    assert len(completed) == 20
+    assert any(
+        reason.startswith("partial_history") for m in prepared for reason in m.omitted.values()
+    )
+    assert {a: sum(c.agent_id == a for c in completed) for a in agents} == dict.fromkeys(agents, 5)
+    assert all(c.usage.output_tokens == 470 and c.response_artifact for c in completed)
+    assert sum(call[0][-1] == "-" for call in fake_cli.calls) == 20
+    operations = BudgetStore(controller.settings.database_path).operations()
+    assert len(operations) == 20 and all(o["state"] == "completed" for o in operations)
+    assert all(o["quota_consumed"] is None for o in operations)
+    assert any(isinstance(p, Challenge) and not p.responds_to_id for p in records)
+    assert any(isinstance(p, Challenge) and p.responds_to_id for p in records)
+    assert any(isinstance(p, Claim) and p.revises_id for p in records)
+    assert any(isinstance(p, Decision) for p in records)
+    decisions = [p for p in records if isinstance(p, ResponseNormalization)]
+    assert len(decisions) == 20 and all(p.disposition == "accepted" for p in decisions)
+    assert {p.model_call_id for p in decisions} == {c.id for c in completed}
+    assert sum(p.transforms == ("json_fence", "singleton_operations") for p in decisions) == 4
+    assert all(
+        any(p.kind in {"claim", "challenge", "decision", "claim_assessment"} for p in e.payload)
+        for e in bundle.events
+        if any(isinstance(p, ResponseNormalization) for p in e.payload)
+    )
+
+
+@pytest.mark.parametrize(
+    ("text", "code", "disposition"),
+    [
+        ('```json\n{"research_action": {}}\n```\nExtra prose', "malformed_json", "format_rejected"),
+        ('{"research_action": []}', "invalid_action_object", "format_rejected"),
+        ('{"research_action": {"operations": []}}', "operation_count", "format_rejected"),
+        ('{"research_action": {"operations": [{}, {}]}}', "operation_count", "format_rejected"),
+        (
+            '{"research_action": {"operation": []}}',
+            "invalid_operation_or_reference",
+            "action_rejected",
+        ),
+        (
+            '{"research_action": {"operation": "claim", "proposition": 42}}',
+            "invalid_action_fields",
+            "action_rejected",
+        ),
+        (
+            '{"research_action": {"operation": "checkpoint"}}',
+            "invalid_operation_or_reference",
+            "action_rejected",
+        ),
+        (
+            '{"research_action": {"operation": "claim", "proposition": "x", "author_id": "spoof"}}',
+            "invalid_operation_or_reference",
+            "action_rejected",
+        ),
+        (
+            '{"research_action": {"operation": "challenge", "objection": "x", '
+            '"claim_id": "f2a7bd39-9d1a-42eb-bf2e-48df015f2cb2"}}',
+            "invalid_operation_or_reference",
+            "action_rejected",
+        ),
+    ],
+)
+def test_invalid_research_reply_records_call_and_no_action(
+    controller, fake_cli, text, code, disposition
+):
+    from doxa.core.action_normalization import ResearchReplyError
+
+    # Also cover malformed JSON received with CLI-native schema enabled.
+    run, _ = configured(controller, fake_cli, structured="native")
+    fake_cli.text = text
+    with pytest.raises(ResearchReplyError) as error:
+        asyncio.run(
+            DebateRuntime(controller, run.id).execute_debate(
+                DebateExecution(authorize_external=True, authorize_quota=True)
+            )
+        )
+    assert error.value.code == code
+    bundle = controller.inspect(run.id)
+    assert bundle.run.status == "failed"
+    assert not any(isinstance(p, Claim) for e in bundle.events for p in e.payload)
+    rows = [p for e in bundle.events for p in e.payload]
+    audit = next(p for p in rows if isinstance(p, ResponseNormalization))
+    call = controller.ledger.get(audit.model_call_id)
+    assert isinstance(call, ModelCall) and call.status == "completed"
+    assert call.response_artifact and audit.disposition == disposition
+    store = ArtifactStore(controller.settings.data_dir / "artifacts")
+    assert json.loads(store.get(call.response_artifact))["text"] == text
+    assert audit.input_sha256 == hashlib.sha256(text.encode()).hexdigest()
+    assert audit.reason_code == code
+    assert next(p.reason_code for p in reversed(rows) if isinstance(p, RunState)) == (
+        f"{error.value.category}:{code}"
+    )
+    operations = BudgetStore(controller.settings.database_path).operations()
+    assert len(operations) == 1 and operations[0]["state"] == "completed"
 
 
 def test_outer_timeout_is_uncertain_and_never_retried(fake_cli, monkeypatch):
@@ -750,11 +985,67 @@ def test_outer_timeout_is_uncertain_and_never_retried(fake_cli, monkeypatch):
     assert not fake_cli.calls
 
 
-def test_final_size_rejection_preserves_observed_usage(fake_cli):
-    fake_cli.text = "x" * 513
+@pytest.mark.parametrize("with_final_file", [True, False])
+def test_reported_token_limit_is_not_a_utf8_byte_limit(fake_cli, with_final_file):
+    if not with_final_file:
+        fake_cli.flags = fake_cli.flags.replace(" --output-last-message", "")
+    fake_cli.text = "An evidence citation — 研究. " * 45
+    fake_cli.usage = {"input_tokens": 10593, "output_tokens": 470}
+    result = asyncio.run(cli.CodexCliProvider(profile()).generate(request()))
+    assert len(fake_cli.text.encode()) > 512
+    assert result.error is None and result.completion_state == "completed"
+    assert result.text == fake_cli.text and result.usage.output_tokens == 470
+
+
+@pytest.mark.parametrize("with_final_file", [True, False])
+def test_final_size_rejection_preserves_observed_usage(fake_cli, with_final_file):
+    if not with_final_file:
+        fake_cli.flags = fake_cli.flags.replace(" --output-last-message", "")
+    fake_cli.text = "x" * (cli.FINAL_RESPONSE_BYTE_LIMIT + 1)
     result = asyncio.run(cli.CodexCliProvider(profile()).generate(request()))
     assert result.error.category == "invalid_response"
+    assert result.raw_response["diagnostic_code"] == "cli_final_byte_limit"
+    assert result.text is None
     assert result.usage.input_tokens == 12 and result.usage.output_tokens == 4
+
+
+def test_reported_tokens_above_limit_reject_answer_even_when_short(fake_cli):
+    fake_cli.usage["output_tokens"] = 513
+    result = asyncio.run(cli.CodexCliProvider(profile()).generate(request()))
+    assert result.raw_response["diagnostic_code"] == "cli_output_token_limit"
+    assert not result.error.billing_uncertain and not result.error.retryable
+    assert result.completion_state == "incomplete"
+    assert result.usage.output_tokens == 513 and result.text is None
+
+
+def test_empty_final_file_falls_back_to_event_answer(fake_cli):
+    fake_cli.final_bytes = b" \n"
+    result = asyncio.run(cli.CodexCliProvider(profile()).generate(request()))
+    assert result.error is None and result.text == fake_cli.text
+
+
+def test_invalid_final_encoding_does_not_leak_response(fake_cli):
+    fake_cli.final_bytes = b"private invalid response\xff"
+    result = asyncio.run(cli.CodexCliProvider(profile()).generate(request()))
+    assert result.raw_response["diagnostic_code"] == "cli_invalid_final_encoding"
+    assert "private invalid response" not in result.model_dump_json()
+    assert result.text is None and result.usage.output_tokens == 4
+
+
+def test_timeout_after_observed_turn_remains_uncertain(fake_cli, monkeypatch):
+    runner = cli.run_process
+
+    async def pending(argv, *args, **kwargs):
+        if argv[-1] != "-":
+            return await runner(argv, *args, **kwargs)
+        kwargs["on_event"]("turn_finished")
+        raise TimeoutError
+
+    monkeypatch.setattr(cli, "run_process", pending)
+    result = asyncio.run(cli.CodexCliProvider(profile()).generate(request()))
+    assert result.raw_response["diagnostic_code"] == "cli_timeout_after_turn"
+    assert result.error.billing_uncertain and not result.error.retryable
+    assert result.text is None
 
 
 def test_native_schema_missing_fails_before_model_dispatch(fake_cli):

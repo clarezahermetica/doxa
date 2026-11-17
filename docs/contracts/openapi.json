@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "DOXA foundation",
-    "version": "0.1.0a0"
+    "version": "0.1.0a1"
   },
   "paths": {
     "/api/workbench/runs/{run_id}/tools": {
@@ -1423,6 +1423,9 @@
                         "$ref": "#/components/schemas/ClaimAssessment"
                       },
                       {
+                        "$ref": "#/components/schemas/ResponseNormalization"
+                      },
+                      {
                         "$ref": "#/components/schemas/ResearchOutcome"
                       },
                       {
@@ -1487,6 +1490,7 @@
                         "procedure_manifest": "#/components/schemas/ProcedureManifest",
                         "provider_activity": "#/components/schemas/ProviderActivity",
                         "claim_assessment": "#/components/schemas/ClaimAssessment",
+                        "response_normalization": "#/components/schemas/ResponseNormalization",
                         "research_outcome": "#/components/schemas/ResearchOutcome",
                         "evidence": "#/components/schemas/Evidence",
                         "decision": "#/components/schemas/Decision",
@@ -4396,6 +4400,22 @@
             "title": "Source Ids",
             "default": []
           },
+          "source_passages": {
+            "items": {
+              "$ref": "#/components/schemas/SourcePassage-Output"
+            },
+            "type": "array",
+            "title": "Source Passages",
+            "default": []
+          },
+          "required_passages": {
+            "items": {
+              "$ref": "#/components/schemas/PassageAvailability"
+            },
+            "type": "array",
+            "title": "Required Passages",
+            "default": []
+          },
           "memory_ids": {
             "items": {
               "type": "string",
@@ -4458,6 +4478,8 @@
           "profile_version",
           "task_version",
           "source_ids",
+          "source_passages",
+          "required_passages",
           "memory_ids",
           "history_ids",
           "messages",
@@ -5383,6 +5405,9 @@
                   "$ref": "#/components/schemas/ClaimAssessment"
                 },
                 {
+                  "$ref": "#/components/schemas/ResponseNormalization"
+                },
+                {
                   "$ref": "#/components/schemas/ResearchOutcome"
                 },
                 {
@@ -5457,6 +5482,7 @@
                   "provider_activity": "#/components/schemas/ProviderActivity",
                   "reflection_decision": "#/components/schemas/ReflectionDecision",
                   "research_outcome": "#/components/schemas/ResearchOutcome",
+                  "response_normalization": "#/components/schemas/ResponseNormalization",
                   "retrieval_audit": "#/components/schemas/RetrievalAudit",
                   "run": "#/components/schemas/Run",
                   "run_state": "#/components/schemas/RunState",
@@ -7535,6 +7561,47 @@
         ],
         "title": "ParticipantGroup"
       },
+      "PassageAvailability": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "passage": {
+            "$ref": "#/components/schemas/SourcePassage-Output"
+          },
+          "challenge_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Challenge Ids"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "supplied",
+              "omitted_budget",
+              "source_absent",
+              "source_ineligible",
+              "passage_unavailable"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "passage",
+          "challenge_ids",
+          "status"
+        ],
+        "title": "PassageAvailability"
+      },
       "Permissions-Input": {
         "properties": {
           "schema_version": {
@@ -8548,6 +8615,130 @@
         ],
         "title": "RespondCommand"
       },
+      "ResponseNormalization": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "experiment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Experiment Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "trajectory_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trajectory Id"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "kind": {
+            "type": "string",
+            "const": "response_normalization",
+            "title": "Kind",
+            "default": "response_normalization"
+          },
+          "normalizer_version": {
+            "type": "string",
+            "title": "Normalizer Version"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Agent Id"
+          },
+          "context_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Context Id"
+          },
+          "model_call_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Call Id"
+          },
+          "input_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Input Sha256"
+          },
+          "execution_kind": {
+            "type": "string",
+            "enum": [
+              "live",
+              "synthetic"
+            ],
+            "title": "Execution Kind"
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "format_rejected",
+              "action_rejected"
+            ],
+            "title": "Disposition"
+          },
+          "transforms": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "json_fence",
+                "singleton_operations"
+              ]
+            },
+            "type": "array",
+            "title": "Transforms",
+            "default": []
+          },
+          "reason_code": {
+            "type": "string",
+            "title": "Reason Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "id",
+          "experiment_id",
+          "run_id",
+          "trajectory_id",
+          "provenance",
+          "kind",
+          "normalizer_version",
+          "agent_id",
+          "context_id",
+          "model_call_id",
+          "input_sha256",
+          "execution_kind",
+          "disposition",
+          "transforms",
+          "reason_code"
+        ],
+        "title": "ResponseNormalization"
+      },
       "RetrievalAudit": {
         "properties": {
           "schema_version": {
@@ -8930,6 +9121,15 @@
             "type": "array",
             "title": "Source Ids",
             "default": []
+          },
+          "citation_ranges": {
+            "items": {
+              "$ref": "#/components/schemas/SourcePassage-Input"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Citation Ranges",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -9019,6 +9219,15 @@
               }
             ],
             "title": "Requested Correction"
+          },
+          "citation_ranges": {
+            "items": {
+              "$ref": "#/components/schemas/SourcePassage-Input"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Citation Ranges",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -9153,6 +9362,15 @@
             },
             "type": "object",
             "title": "Citation Spans"
+          },
+          "citation_ranges": {
+            "items": {
+              "$ref": "#/components/schemas/SourcePassage-Input"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Citation Ranges",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -9253,6 +9471,15 @@
             "maxLength": 4000,
             "minLength": 1,
             "title": "Reason"
+          },
+          "citation_ranges": {
+            "items": {
+              "$ref": "#/components/schemas/SourcePassage-Input"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Citation Ranges",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -9434,6 +9661,15 @@
               }
             ],
             "title": "Revised Proposition"
+          },
+          "citation_ranges": {
+            "items": {
+              "$ref": "#/components/schemas/SourcePassage-Input"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Citation Ranges",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -9911,6 +10147,73 @@
           "revises_id"
         ],
         "title": "SourceDocument"
+      },
+      "SourcePassage-Input": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Id"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "End"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_id",
+          "start",
+          "end"
+        ],
+        "title": "SourcePassage"
+      },
+      "SourcePassage-Output": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Id"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "End"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schema_version",
+          "source_id",
+          "start",
+          "end"
+        ],
+        "title": "SourcePassage"
       },
       "TaskSpecification-Input": {
         "properties": {

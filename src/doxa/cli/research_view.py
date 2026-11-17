@@ -82,13 +82,19 @@ class CitationScreen(ClientModal[None]):
 
                 source = controller.ledger.get(UUID(evidence.source.split(":", 1)[1]))
                 if isinstance(source, SourceDocument):
-                    self.sources[str(source.id)] = (evidence, source)
+                    self.sources[str(evidence.id)] = (evidence, source)
 
     def compose(self) -> ComposeResult:
         with Vertical(id="citation-dialog"):
             yield Label("Evidence passage · citation location may be unverified", markup=False)
             yield Select(
-                [(Text(source.title), key) for key, (_, source) in self.sources.items()],
+                [
+                    (
+                        Text(source.title + " · " + (evidence.source_location or "document link")),
+                        key,
+                    )
+                    for key, (evidence, source) in self.sources.items()
+                ],
                 prompt="Select cited source",
                 id="citation-source",
             )
@@ -189,14 +195,93 @@ class ThreadScreen(ClientModal[None]):
         "citation-", "thread-"
     )
 
-    def __init__(self, controller: Any, thread: ClaimThread, names: dict[Any, str]):
+    def __init__(
+        self,
+        controller: Any,
+        thread: ClaimThread,
+        names: dict[Any, str],
+        human_labels: set[UUID] | None = None,
+        *,
+        initial_claim_id: UUID | None = None,
+    ):
         super().__init__()
         self.controller, self.thread, self.names = controller, thread, names
+        self.initial_claim_id = initial_claim_id or thread.current.id
+        self.sections: dict[str, tuple[str, str, tuple[UUID, ...]]] = {}
+        versions = {claim.id: i for i, claim in enumerate(thread.versions, 1)}
+        for claim in thread.versions:
+            i = versions[claim.id]
+            current = " · current" if claim.id == thread.current.id else ""
+            who = names.get(claim.author_id, "Unknown author")
+            label = f"v{i}{current} · Claim · {who}"
+            review = (
+                "\nHuman correction labels recorded; see annotations."
+                if claim.revises_id and claim.id in (human_labels or set())
+                else "\nHuman correction quality: unknown (unlabeled revision)."
+                if claim.revises_id
+                else ""
+            )
+            self.sections[str(claim.id)] = (
+                label,
+                f"{label}{review}\n\n{claim.proposition}",
+                claim.evidence_ids,
+            )
+            for objection in (p for p in thread.criticisms if p.claim_id == claim.id):
+                critic = names.get(objection.critic_id, "Unknown critic")
+                label = f"v{i} · Criticism · {critic}"
+                self.sections[str(objection.id)] = (
+                    label,
+                    f"{label}\n\n{objection.objection}",
+                    objection.evidence_ids,
+                )
+                for answer in (p for p in thread.responses if p.responds_to_id == objection.id):
+                    label = f"v{i} · Author response · {answer.response}"
+                    self.sections[str(answer.id)] = (
+                        label,
+                        f"{label}\n\n{answer.objection}",
+                        answer.evidence_ids,
+                    )
+            for assessment in (p for p in thread.assessments if p.claim_id == claim.id):
+                label = f"v{i} · Reassessment · {assessment.stance}"
+                self.sections[str(assessment.id)] = (
+                    label,
+                    f"{label}\n\n{assessment.reason}",
+                    assessment.evidence_ids,
+                )
+            for judgment in (p for p in thread.decisions if p.claim_id == claim.id):
+                who = names.get(judgment.adjudicator_id, "Reviewer")
+                label = f"v{i} · Judgment · {who} · {judgment.outcome}"
+                self.sections[str(judgment.id)] = (
+                    label,
+                    f"{label}{current or ' · prior version'}\n"
+                    f"Provenance: {judgment.provenance}\n\n{judgment.reason}",
+                    judgment.evidence_ids,
+                )
+        ids = tuple(dict.fromkeys(e for _, _, refs in self.sections.values() for e in refs))
+        self.sections["full"] = ("Full recorded exchange", thread_text(thread, names), ids)
+        if len(versions) > 1:
+            original = thread.versions[0].proposition.split()
+            current_words = thread.current.proposition.split()
+            changes = []
+            matcher = difflib.SequenceMatcher(a=original, b=current_words, autojunk=False)
+            for tag, ai, az, bi, bz in matcher.get_opcodes():
+                if tag in {"replace", "delete"}:
+                    changes.append("− " + " ".join(original[ai:az]))
+                if tag in {"replace", "insert"}:
+                    changes.append("+ " + " ".join(current_words[bi:bz]))
+            label = f"Compare v1 → v{len(versions)} · Word changes"
+            self.sections["diff"] = (label, label + "\n\n" + "\n\n".join(changes), ids)
 
     def compose(self) -> ComposeResult:
         with Vertical(id="thread-dialog"):
-            yield Label("Claim · criticism · response · revisions · judgments", markup=False)
-            yield TextArea(thread_text(self.thread, self.names), read_only=True, id="thread-text")
+            yield Label("Claim exchange · " + self.thread.position, markup=False)
+            yield Select(
+                [(Text(label), key) for key, (label, _, _) in self.sections.items()],
+                allow_blank=False,
+                value=str(self.initial_claim_id),
+                id="thread-section",
+            )
+            yield TextArea(read_only=True, id="thread-text")
             with Horizontal(id="thread-controls"):
                 yield Button("Sources", id="thread-sources")
                 yield Button(
@@ -207,23 +292,39 @@ class ThreadScreen(ClientModal[None]):
                 )
                 yield Button("Close", id="thread-close")
 
+    def on_mount(self) -> None:
+        self.show_section()
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "thread-section":
+            self.show_section()
+
+    def show_section(self) -> None:
+        value = self.query_one("#thread-section", Select).value
+        if isinstance(value, str) and value in self.sections:
+            _, text, refs = self.sections[value]
+            area = self.query_one("#thread-text", TextArea)
+            area.load_text(text)
+            area.scroll_home(animate=False)
+            self.query_one("#thread-sources", Button).disabled = not refs
+            self.query_one("#thread-quality", Button).disabled = not any(
+                str(claim.id) == value and claim.revises_id for claim in self.thread.versions
+            )
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "thread-close":
             self.dismiss(None)
         elif event.button.id == "thread-quality":
-            self.app.push_screen(QualityScreen(self.controller, self.thread.current))
+            value = self.query_one("#thread-section", Select).value
+            for claim in self.thread.versions:
+                if str(claim.id) == value and claim.revises_id:
+                    self.app.push_screen(QualityScreen(self.controller, claim))
+                    break
         else:
-            records = [
-                *self.thread.versions,
-                *self.thread.criticisms,
-                *self.thread.responses,
-                *self.thread.assessments,
-                *self.thread.decisions,
-            ]
-            ids = tuple(dict.fromkeys(e for r in records for e in getattr(r, "evidence_ids", ())))
-            self.app.push_screen(
-                CitationScreen(self.controller, ids, thread_text(self.thread, self.names))
-            )
+            value = self.query_one("#thread-section", Select).value
+            if isinstance(value, str) and value in self.sections:
+                _, text, ids = self.sections[value]
+                self.app.push_screen(CitationScreen(self.controller, ids, text))
 
 
 class QualityScreen(ClientModal[None]):
@@ -238,6 +339,10 @@ class QualityScreen(ClientModal[None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="quality-dialog"):
             yield Label("Human correction labels; uncertainty must remain unknown", markup=False)
+            yield Label(
+                "Labels are optional and version-specific. Unknown values are not scored.",
+                markup=False,
+            )
             yield Input(
                 value="local-operator", placeholder="Human reviewer identity", id="quality-reviewer"
             )

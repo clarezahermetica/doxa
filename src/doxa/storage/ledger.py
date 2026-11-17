@@ -306,6 +306,20 @@ class Ledger:
             ).fetchall()
         return [Event.model_validate_json(row[0]) for row in rows]
 
+    def latest_event_id(self, run_id: UUID) -> UUID | None:
+        with connection(self.path) as db:
+            row = db.execute(
+                "SELECT id FROM events WHERE run_id=? ORDER BY rowid DESC LIMIT 1", (str(run_id),)
+            ).fetchone()
+        return UUID(row[0]) if row else None
+
+    def attempt_timestamps(self) -> dict[str, str]:
+        with connection(self.path) as db:
+            return dict(db.execute("""
+                SELECT run_id, json_extract(body,'$.timestamp') FROM events
+                WHERE rowid IN (SELECT MIN(rowid) FROM events GROUP BY run_id)
+            """).fetchall())
+
     def records(self, kind: str | None = None) -> list[Record]:
         with connection(self.path) as db:
             rows = db.execute(

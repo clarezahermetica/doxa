@@ -60,9 +60,9 @@ if TYPE_CHECKING:
 
 
 class ProviderCallFailed(RuntimeError):
-    def __init__(self, category: str):
+    def __init__(self, category: str, *, detail: str | None = None):
         self.category = category
-        super().__init__("Provider " + category)
+        super().__init__("Provider " + category + (f": {detail}" if detail else ""))
 
 
 class ExecuteTask(Contract):
@@ -87,6 +87,7 @@ class Runtime:
         self.branch = self.bundle.events[-1].trajectory_id
         self.store = ArtifactStore(controller.settings.data_dir / "artifacts")
         self.calls = BudgetStore(controller.settings.database_path)
+        self.recorded_model_responses: dict[str, ModelCall] = {}
         self.started = time.monotonic()
         self.command: ExecuteTask
 
@@ -436,7 +437,9 @@ class Runtime:
         )
         self.ensure_running()
         if response.error:
-            raise ProviderCallFailed(response.error.category)
+            raise ProviderCallFailed(
+                response.error.category, detail=response.error.safe_message if quota else None
+            )
         if response.completion_state != "completed":
             raise ProviderCallFailed("incomplete_or_unsupported_tool_response")
         return response.text or ""
@@ -552,7 +555,9 @@ class Runtime:
                     dict(
                         **self.scope(Provenance.MODEL_OUTPUT),
                         id=self.identity(phase + ":message"),
-                        message_type="CLAIM",
+                        message_type="ACTION"
+                        if self.experiment.task and self.experiment.task.structured_actions
+                        else "CLAIM",
                         sender_id=agent.id,
                         visibility="private",
                         content=safe_text(response.text),
@@ -570,6 +575,7 @@ class Runtime:
             outcome="uncertain" if uncertain else "failed" if response.error else "completed",
             billed_usd=response.usage.billed_usd,
         )
+        self.recorded_model_responses[phase] = record
 
     def check(self, candidate: Candidate, key: str) -> tuple[Claim, Verification, bool]:
         checks = sum(

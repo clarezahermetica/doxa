@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from doxa.version import TERMINAL_BUILD, VERSION
+from doxa.version import DISPLAY_VERSION, TERMINAL_BUILD, VERSION
 
 
 def runtime_identity(workspace: Path) -> dict[str, Any]:
@@ -44,6 +44,7 @@ def runtime_identity(workspace: Path) -> dict[str, Any]:
             pass
     return {
         "application_version": VERSION,
+        "display_version": DISPLAY_VERSION,
         "terminal_build": TERMINAL_BUILD,
         "source_commit": commit,
         "python_version": sys.version.split()[0],

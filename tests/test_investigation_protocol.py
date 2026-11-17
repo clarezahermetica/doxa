@@ -12,7 +12,10 @@ from doxa.core.models import (
     ClaimAssessment,
     CouncilLimits,
     Decision,
+    Evidence,
+    ModelCall,
     ResearchOutcome,
+    ResponseNormalization,
     Role,
     TaskSpecification,
 )
@@ -86,6 +89,78 @@ def test_full_cycle_can_end_unresolved_without_consensus(controller):
     thread = claim_threads(controller, run.id, runtime.branch)[0]
     assert len(thread.versions) == 2 and thread.responses and thread.assessments
     assert "unresolved" in thread.position
+
+
+def test_normalized_council_preserves_conflicting_evidence_and_unresolved_disagreement(controller):
+    run = prepare(controller, rounds=1, text="Synthetic report A: improvement on Task A.")
+    contrasting = import_source(
+        controller,
+        run.id,
+        ImportSource(
+            title="Contrasting fixture",
+            text="Synthetic report B: regression on Task B.",
+            idempotency_key="contrasting-fixture",
+        ),
+    )
+    runtime = DebateRuntime(controller, run.id)
+    base = runtime.synthetic_answer
+
+    def replies(actor, phase, manifest):
+        action = json.loads(base(actor, phase, manifest))["research_action"]
+        assert contrasting.id in manifest.source_ids
+        primary = next(i for i in manifest.source_ids if i != contrasting.id)
+        if action["operation"] == "claim":
+            action.update(
+                proposition="Improvement on Task A may generalize.", source_ids=[str(primary)]
+            )
+        elif action["operation"] == "challenge":
+            action.update(
+                objection="Task B regressed; this defeats the generalization.",
+                source_ids=[str(contrasting.id)],
+            )
+        elif action["operation"] == "respond":
+            action.update(
+                revised_proposition="Task A improved; generalization is unresolved.",
+                source_ids=[str(contrasting.id)],
+            )
+        elif action["operation"] == "assess":
+            action.update(
+                stance="dispute",
+                reason="Task effects still conflict.",
+                source_ids=[str(contrasting.id)],
+            )
+        elif action["operation"] == "adjudicate":
+            action.update(
+                outcome="investigate",
+                reason="The reports disagree across tasks.",
+                source_ids=[str(primary), str(contrasting.id)],
+            )
+        if action["operation"] in {"challenge", "adjudicate"}:
+            action = {"operations": [action]}
+        return "```json\n" + json.dumps({"research_action": action}) + "\n```"
+
+    runtime.synthetic_answer = replies
+    bundle = asyncio.run(runtime.execute_debate(DebateExecution()))
+    rows = [p for e in bundle.events for p in e.payload]
+    assert bundle.run.status == "completed" and not any(isinstance(p, ModelCall) for p in rows)
+    thread = claim_threads(controller, run.id, runtime.branch)[0]
+    original, revision = thread.versions
+    assert revision.revises_id == original.id
+    assert thread.responses[0].responds_to_id == thread.criticisms[0].id
+    assert thread.assessments[0].stance == "dispute" and "unresolved" in thread.position
+    (decision,) = thread.decisions
+    assert decision.claim_id == revision.id and decision.outcome == "investigate"
+    assert {
+        p.source for p in rows if isinstance(p, Evidence) and p.id in decision.evidence_ids
+    } == {
+        f"source-document:{contrasting.id}",
+        next(p.source for p in rows if isinstance(p, Evidence) and p.id in original.evidence_ids),
+    }
+    outcome = next(p for p in rows if isinstance(p, ResearchOutcome))
+    assert outcome.epistemic_outcome == "unresolved" and outcome.turns == 5
+    audits = [p for p in rows if isinstance(p, ResponseNormalization)]
+    assert len(audits) == 5 and all(p.execution_kind == "synthetic" for p in audits)
+    assert sum("singleton_operations" in p.transforms for p in audits) == 2
 
 
 def test_justified_maintenance_does_not_require_a_revision(controller):

@@ -12,6 +12,8 @@ from textual.widgets import Button, DataTable, Input, Label, Select, TextArea
 from typer import _click as click
 from typer.core import TyperGroup, TyperOption
 
+from doxa.version import DISPLAY_VERSION
+
 REFERENCE_CATEGORIES = (
     "Common research tasks",
     "Getting started",
@@ -37,6 +39,19 @@ class ActionSpec:
 
 
 ACTIONS = (
+    ActionSpec(
+        "about",
+        "About DOXA",
+        "Show the product version and research limitations.",
+        "Workspace and maintenance",
+    ),
+    ActionSpec(
+        "live_council",
+        "Open Live Council",
+        "Follow committed contributions live or replay the same feed after completion.",
+        "Experiments and runs",
+        required="Selected run. Inspection does not start a worker.",
+    ),
     ActionSpec(
         "control",
         "Prepare controlled experiment",
@@ -172,6 +187,13 @@ ACTIONS = (
         required="Existing profile and explicit metadata-disclosure authorization; no inference.",
     ),
     ActionSpec(
+        "run_summary",
+        "Inspect run summary and coverage",
+        "Read protocol, attempt, model provenance, usage and observed research-system coverage.",
+        "Results",
+        required="Selected run. No model inference or changes to history.",
+    ),
+    ActionSpec(
         "export",
         "Export experiment history",
         "Export exact history to a new file without overwriting another export.",
@@ -188,7 +210,7 @@ ACTIONS = (
     ActionSpec(
         "guide",
         "Getting Started",
-        "Open research, configure an experiment, try an offline demo or browse help.",
+        "Open existing research, configure an experiment or browse help.",
         "Help",
     ),
     ActionSpec(
@@ -455,7 +477,7 @@ class CommandReference(ModalScreen[str | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="reference-dialog"):
-            yield Label("Help · terminal actions and shell reference", id="reference-title")
+            yield Label(DISPLAY_VERSION + " · Help", id="reference-title")
             yield Input(
                 placeholder="Search names, arguments, shortcuts, limitations…",
                 id="reference-search",
@@ -513,7 +535,7 @@ class CommandReference(ModalScreen[str | None]):
             8, max(3, len(self.matches) + 1)
         )
         self.query_one("#reference-title", Label).update(
-            f"Help · {len(self.matches):,} matches · shell entries are reference only"
+            f"{DISPLAY_VERSION} · Help · {len(self.matches):,} matches · shell refs only"
         )
         self.current = self.matches[0] if self.matches else None
         self.show_entry()

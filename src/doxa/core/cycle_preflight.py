@@ -181,7 +181,8 @@ def cycle_preflight(
                     (k for k in ("proposition", "objection", "reason") if k in action), None
                 )
                 if field:
-                    padding = max(0, min(stress_bytes, request.max_output_tokens - 512))
+                    # Stress history growth independently of the provider token limit.
+                    padding = max(0, min(stress_bytes, 3000))
                     action[field] += ' OFFLINE STRESS punctuation \\" 中文 ' * (padding // 55)
                     action[field] = action[field][:3900]
                 text = json.dumps(body)

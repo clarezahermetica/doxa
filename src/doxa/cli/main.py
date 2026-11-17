@@ -18,11 +18,15 @@ from doxa.core.research_commands import Command
 from doxa.core.retrieval_commands import RetrievalQuery
 from doxa.core.retrieval_commands import query as retrieval_query
 from doxa.storage.budget import BudgetStore
+from doxa.version import DISPLAY_VERSION
 
 DEFAULT_DATA_DIR = Settings().data_dir
 
 app = typer.Typer(
-    invoke_without_command=True, no_args_is_help=False, pretty_exceptions_show_locals=False
+    invoke_without_command=True,
+    no_args_is_help=False,
+    pretty_exceptions_show_locals=False,
+    help=DISPLAY_VERSION + " — terminal research workbench.",
 )
 
 

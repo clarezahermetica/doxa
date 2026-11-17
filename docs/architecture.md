@@ -75,6 +75,10 @@ temporary working directory; session references remain local. Subscription-quota
 is transactional in the canonical ledger, separate from dollar reservations; unknown
 consumption/cost stays null. See [CLI providers](cli-providers.md) for controls and limits.
 
+[Research reply normalization](research-response-normalization.md) separates wire syntax
+from controller authorization. The ledger links each normalization decision to the
+original response; an accepted action and its normalization decision commit together.
+
 ## Evidence and tools
 
 Source bytes, extracted text and context manifests have separate provenance and hashes.
